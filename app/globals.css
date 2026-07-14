@@ -1,0 +1,180 @@
+@import "tailwindcss";
+
+:root {
+  /* Palette sombre par défaut : correspond au thème initial défini côté React
+     (ThemeProvider démarre à "dark"), pour éviter un flash de mauvais thème
+     avant l'hydratation. */
+  --bg: #0f1115;
+  --surface: #161920;
+  --surface-2: #1d2129;
+  --fg: #e8e6e3;
+  --muted: #9aa0ac;
+  --border: #262b33;
+  --accent: #5b7fde;
+  --accent-fg: #ffffff;
+
+  --status-todo: #8a8f98;
+  --status-inprogress: #5b7fde;
+  --status-done: #4c9a6a;
+
+  --severity-critical: #e0555b;
+  --severity-major: #dda34d;
+  --severity-minor: #7c8591;
+}
+
+[data-theme="light"] {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --surface-2: #f0efea;
+  --fg: #1c1e21;
+  --muted: #6b6f76;
+  --border: #e2e0db;
+  --accent: #5b7fde;
+  --accent-fg: #ffffff;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+
+  --color-status-todo: var(--status-todo);
+  --color-status-inprogress: var(--status-inprogress);
+  --color-status-done: var(--status-done);
+
+  --color-severity-critical: var(--severity-critical);
+  --color-severity-major: var(--severity-major);
+  --color-severity-minor: var(--severity-minor);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* Badges de statut / sévérité */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  font-weight: 500;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.badge-todo {
+  color: var(--status-todo);
+  border-color: var(--status-todo);
+  background: color-mix(in srgb, var(--status-todo) 15%, transparent);
+}
+.badge-inprogress {
+  color: var(--status-inprogress);
+  border-color: var(--status-inprogress);
+  background: color-mix(in srgb, var(--status-inprogress) 15%, transparent);
+}
+.badge-done {
+  color: var(--status-done);
+  border-color: var(--status-done);
+  background: color-mix(in srgb, var(--status-done) 15%, transparent);
+}
+.badge-critical {
+  color: var(--severity-critical);
+  border-color: var(--severity-critical);
+  background: color-mix(in srgb, var(--severity-critical) 15%, transparent);
+}
+.badge-major {
+  color: var(--severity-major);
+  border-color: var(--severity-major);
+  background: color-mix(in srgb, var(--severity-major) 15%, transparent);
+}
+.badge-minor {
+  color: var(--severity-minor);
+  border-color: var(--severity-minor);
+  background: color-mix(in srgb, var(--severity-minor) 15%, transparent);
+}
+.badge-sprint {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.badge-status {
+  color: var(--muted);
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+/* Champs de formulaire */
+.input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+.input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Boutons */
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: opacity 0.15s ease;
+}
+.btn-primary:hover {
+  opacity: 0.9;
+}
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease;
+}
+.btn-secondary:hover {
+  background: var(--surface-2);
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--severity-critical);
+  border: 1px solid var(--severity-critical);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease;
+}
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--severity-critical) 12%, transparent);
+}
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

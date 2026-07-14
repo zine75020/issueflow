@@ -1,0 +1,302 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Modal } from "@/components/Modal";
+import { Field } from "@/components/Field";
+import { useColumns } from "@/lib/useColumns";
+import { FIBONACCI_OPTIONS, TITLE_MAX_LENGTH, TEXT_MAX_LENGTH } from "@/lib/constants";
+import type { Epic, Sprint, Story } from "@/lib/types";
+
+export function StoryDetail({
+  id,
+  epics,
+  sprints,
+  onClose,
+  onChanged,
+}: {
+  id: string;
+  epics: Epic[];
+  sprints: Sprint[];
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [story, setStory] = useState<Story | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
+  const [storyPoints, setStoryPoints] = useState("");
+  const [remainingEffort, setRemainingEffort] = useState("");
+  const [statusColumnId, setStatusColumnId] = useState("");
+  const [epicId, setEpicId] = useState("");
+  const [sprintId, setSprintId] = useState("");
+  const { columns } = useColumns();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/stories/${id}`);
+        if (!res.ok) {
+          throw new Error("Erreur lors du chargement de la story.");
+        }
+        const data: Story = await res.json();
+        if (cancelled) return;
+        setStory(data);
+        setTitle(data.title);
+        setDescription(data.description);
+        setAcceptanceCriteria(data.acceptanceCriteria);
+        setStoryPoints(data.storyPoints !== null ? String(data.storyPoints) : "");
+        setRemainingEffort(
+          data.remainingEffort !== null ? String(data.remainingEffort) : ""
+        );
+        setStatusColumnId(data.statusColumnId);
+        setEpicId(data.epicId ?? "");
+        setSprintId(data.sprintId ?? "");
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Erreur inconnue.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/stories/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description,
+          acceptanceCriteria,
+          storyPoints: storyPoints ? Number(storyPoints) : null,
+          remainingEffort: remainingEffort ? Number(remainingEffort) : null,
+          statusColumnId,
+          epicId: epicId || null,
+          sprintId: sprintId || null,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Erreur lors de l'enregistrement.");
+        return;
+      }
+
+      onChanged();
+      onClose();
+    } catch {
+      setError("Erreur réseau, veuillez réessayer.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/stories/${id}`, { method: "DELETE" });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Erreur lors de la suppression.");
+        return;
+      }
+
+      onChanged();
+      onClose();
+    } catch {
+      setError("Erreur réseau, veuillez réessayer.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <Modal title={!loading && story ? story.title : "Story"} onClose={onClose}>
+      {loading && <p className="text-sm text-muted">Chargement…</p>}
+
+      {!loading && !story && (
+        <p className="text-sm text-severity-critical">
+          {error ?? "Story introuvable."}
+        </p>
+      )}
+
+      {!loading && story && (
+        <form onSubmit={handleSave} className="flex flex-col gap-4">
+          {error && <p className="text-sm text-severity-critical">{error}</p>}
+
+          <Field label="Titre" required>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              maxLength={TITLE_MAX_LENGTH}
+              className="input"
+            />
+          </Field>
+
+          <Field label="Description">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              maxLength={TEXT_MAX_LENGTH}
+              className="input"
+            />
+          </Field>
+
+          <Field label="Critères d'acceptation">
+            <textarea
+              value={acceptanceCriteria}
+              onChange={(e) => setAcceptanceCriteria(e.target.value)}
+              rows={3}
+              maxLength={TEXT_MAX_LENGTH}
+              className="input"
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Story points">
+              <select
+                value={storyPoints}
+                onChange={(e) => setStoryPoints(e.target.value)}
+                className="input"
+              >
+                {FIBONACCI_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Remaining Effort (Story Points)">
+              <select
+                value={remainingEffort}
+                onChange={(e) => setRemainingEffort(e.target.value)}
+                className="input"
+              >
+                {FIBONACCI_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Statut">
+              <select
+                value={statusColumnId}
+                onChange={(e) => setStatusColumnId(e.target.value)}
+                className="input"
+              >
+                {columns.map((col) => (
+                  <option key={col.id} value={col.id}>
+                    {col.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Epic">
+              <select
+                value={epicId}
+                onChange={(e) => setEpicId(e.target.value)}
+                className="input"
+              >
+                <option value="">Aucun epic</option>
+                {epics.map((epic) => (
+                  <option key={epic.id} value={epic.id}>
+                    {epic.title}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <Field label="Sprint">
+            <select
+              value={sprintId}
+              onChange={(e) => setSprintId(e.target.value)}
+              className="input"
+            >
+              <option value="">Aucun sprint</option>
+              {sprints.map((sprint) => (
+                <option key={sprint.id} value={sprint.id}>
+                  {sprint.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {confirmingDelete ? (
+            <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">
+              <p className="text-sm text-severity-critical">
+                Supprimer définitivement cette story ?
+              </p>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  className="btn-secondary"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="btn-danger"
+                >
+                  {deleting ? "Suppression…" : "Confirmer"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                className="btn-danger"
+              >
+                Supprimer
+              </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={onClose} className="btn-secondary">
+                  Fermer
+                </button>
+                <button type="submit" disabled={saving} className="btn-primary">
+                  {saving ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
+            </div>
+          )}
+        </form>
+      )}
+    </Modal>
+  );
+}

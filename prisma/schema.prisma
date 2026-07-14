@@ -1,0 +1,104 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Status {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Severity {
+  CRITICAL
+  MAJOR
+  MINOR
+}
+
+enum ItemType {
+  STORY
+  BUG
+  EPIC
+}
+
+model BoardColumn {
+  id       String  @id @default(cuid())
+  name     String
+  order    Int
+  isLocked Boolean @default(false)
+  stories  Story[]
+  bugs     Bug[]
+}
+
+model Epic {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  status      Status   @default(TODO)
+  stories     Story[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Story {
+  id                 String      @id @default(cuid())
+  title              String
+  description        String
+  acceptanceCriteria String
+  storyPoints        Int?
+  remainingEffort    Float?
+  statusColumnId     String
+  statusColumn       BoardColumn @relation(fields: [statusColumnId], references: [id], onDelete: Restrict)
+  epicId             String?
+  epic               Epic?       @relation(fields: [epicId], references: [id])
+  sprintId           String?
+  sprint             Sprint?     @relation(fields: [sprintId], references: [id])
+  backlogPosition    Int
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+}
+
+model Bug {
+  id              String      @id @default(cuid())
+  title           String
+  description     String
+  severity        Severity
+  remainingEffort Float?
+  statusColumnId  String
+  statusColumn    BoardColumn @relation(fields: [statusColumnId], references: [id], onDelete: Restrict)
+  sprintId        String?
+  sprint          Sprint?     @relation(fields: [sprintId], references: [id])
+  backlogPosition Int
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Embedding {
+  id        String   @id @default(cuid())
+  itemType  ItemType
+  itemId    String
+  vector    String
+  model     String
+  updatedAt DateTime @updatedAt
+
+  @@unique([itemType, itemId])
+}
+
+model Sprint {
+  id          String    @id @default(cuid())
+  name        String
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean   @default(false)
+  completedAt DateTime?
+  stories     Story[]
+  bugs        Bug[]
+  createdAt   DateTime  @default(now())
+}
