@@ -98,3 +98,20 @@ export function ArrowDownIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function SparkleIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" {...props}>
+      <path d="M10 2.5c.4 2.7 1 4.2 2 5.2s2.5 1.6 5.2 2c-2.7.4-4.2 1-5.2 2s-1.6 2.5-2 5.2c-.4-2.7-1-4.2-2-5.2s-2.5-1.6-5.2-2c2.7-.4 4.2-1 5.2-2s1.6-2.5 2-5.2z" />
+      <path d="M16 2.2c.16 1 .38 1.6.75 1.97.37.37.97.6 1.97.75-1 .16-1.6.38-1.97.75-.37.37-.6.97-.75 1.97-.16-1-.38-1.6-.75-1.97-.37-.37-.97-.6-1.97-.75 1-.16 1.6-.38 1.97-.75.37-.37.6-.97.75-1.97z" />
+    </svg>
+  );
+}
+
+export function SendIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} {...props}>
+      <path d="M17 3L2.5 9l6 2.5L11 17.5 17 3z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

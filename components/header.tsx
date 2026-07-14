@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "./theme-provider";
-import { SunIcon, MoonIcon, PlusIcon, ChevronIcon } from "./icons";
+import { SunIcon, MoonIcon, PlusIcon, ChevronIcon, SparkleIcon } from "./icons";
 import { StoryFormModal } from "./StoryFormModal";
 import { BugFormModal } from "./BugFormModal";
+import { AssistantPanel } from "./agent/AssistantPanel";
 import { emitDataChanged, onDataChanged } from "@/lib/events";
 import type { Epic, Sprint } from "@/lib/types";
 
@@ -24,6 +25,7 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showStoryForm, setShowStoryForm] = useState(false);
   const [showBugForm, setShowBugForm] = useState(false);
+  const [showAssistant, setShowAssistant] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -163,6 +165,19 @@ export function Header() {
         </div>
 
         <button
+          onClick={() => setShowAssistant((open) => !open)}
+          aria-label="Ouvrir l'Assistant Backlog"
+          className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+            showAssistant
+              ? "border-accent text-accent bg-surface-2"
+              : "border-border hover:bg-surface-2"
+          }`}
+        >
+          <SparkleIcon className="h-4 w-4 text-accent" />
+          Assistant IA
+        </button>
+
+        <button
           onClick={toggleTheme}
           aria-label={theme === "dark" ? "Passer au thème clair" : "Passer au thème sombre"}
           className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-surface-2 transition-colors"
@@ -200,6 +215,8 @@ export function Header() {
           }}
         />
       )}
+
+      {showAssistant && <AssistantPanel onClose={() => setShowAssistant(false)} />}
     </header>
   );
 }
