@@ -86,7 +86,7 @@ export function Header() {
   return (
     <header className="border-b border-border bg-surface px-6 py-3 flex items-center justify-between">
       <div className="flex items-center gap-6">
-        <span className="font-semibold tracking-tight">IssueFlow</span>
+        <span className="font-semibold tracking-tight">ZineBoard</span>
         <nav className="flex items-center gap-1">
           {NAV_LINKS.map((link) => {
             const active = pathname === link.href;

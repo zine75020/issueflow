@@ -1,8 +1,8 @@
-# IssueFlow — Spec fonctionnelle (MVP)
+# ZineBoard — Spec fonctionnelle (MVP)
 
 ## 1. Contexte & scope produit
 
-IssueFlow est un outil de gestion de backlog agile (type Jira simplifié), pensé pour démontrer
+ZineBoard est un outil de gestion de backlog agile (type Jira simplifié), pensé pour démontrer
 la capacité d'un Product Owner à cadrer un produit et à intégrer l'IA dans un vrai workflow métier.
 
 **Éléments gérés :**

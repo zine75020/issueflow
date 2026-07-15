@@ -1,4 +1,4 @@
-# IssueFlow
+# ZineBoard
 
 ## Contexte
 Outil de gestion de backlog agile (type Jira simplifié), avec deux fonctionnalités IA :

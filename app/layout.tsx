@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "IssueFlow",
+  title: "ZineBoard",
   description: "Outil de gestion de backlog agile",
 };
 
