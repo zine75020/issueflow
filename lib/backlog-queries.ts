@@ -76,8 +76,12 @@ export async function searchBacklog(
   const epicIds = idsByType.get(ItemType.EPIC) ?? [];
 
   const [stories, bugs, epics] = await Promise.all([
-    storyIds.length > 0 ? prisma.story.findMany({ where: { id: { in: storyIds } } }) : Promise.resolve([]),
-    bugIds.length > 0 ? prisma.bug.findMany({ where: { id: { in: bugIds } } }) : Promise.resolve([]),
+    storyIds.length > 0
+      ? prisma.story.findMany({ where: { id: { in: storyIds } }, include: { statusColumn: true } })
+      : Promise.resolve([]),
+    bugIds.length > 0
+      ? prisma.bug.findMany({ where: { id: { in: bugIds } }, include: { statusColumn: true } })
+      : Promise.resolve([]),
     epicIds.length > 0 ? prisma.epic.findMany({ where: { id: { in: epicIds } } }) : Promise.resolve([]),
   ]);
 
@@ -96,15 +100,15 @@ export async function searchBacklog(
     .filter((result): result is SearchBacklogResult => result !== null);
 }
 
-export type StoryWithEpic = Prisma.StoryGetPayload<{ include: { epic: true } }>;
+export type StoryWithEpic = Prisma.StoryGetPayload<{ include: { epic: true; statusColumn: true } }>;
 export type EpicWithStories = Prisma.EpicGetPayload<{ include: { stories: true } }>;
 
 export function getStoryById(id: string): Promise<StoryWithEpic | null> {
-  return prisma.story.findUnique({ where: { id }, include: { epic: true } });
+  return prisma.story.findUnique({ where: { id }, include: { epic: true, statusColumn: true } });
 }
 
 export function getBugById(id: string) {
-  return prisma.bug.findUnique({ where: { id } });
+  return prisma.bug.findUnique({ where: { id }, include: { statusColumn: true } });
 }
 
 export function getEpicById(id: string): Promise<EpicWithStories | null> {

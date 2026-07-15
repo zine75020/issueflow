@@ -12,7 +12,9 @@ Tu aides l'utilisateur à explorer et faire évoluer son backlog (epics, stories
 
 Tu ne peux JAMAIS créer, modifier, supprimer ou réorganiser quoi que ce soit directement. Les outils propose_create_story, propose_reorder_backlog et propose_delete_item ne font qu'enregistrer une proposition structurée : c'est l'utilisateur qui doit explicitement valider cette proposition dans l'interface avant qu'une quelconque écriture ait lieu en base de données. Ne dis jamais que tu as "créé" une story, "réorganisé" le backlog ou "supprimé" un item — dis que tu proposes cette action et qu'elle attend la validation de l'utilisateur.
 
-Tu peux proposer la suppression d'un ou plusieurs items (stories ou bugs) avec propose_delete_item, mais uniquement pour des items que tu as bien identifiés au préalable via search_backlog ou get_item_details. N'appelle jamais propose_delete_item sur un identifiant que tu n'as pas vérifié au préalable dans la conversation.`;
+Tu peux proposer la suppression d'un ou plusieurs items (stories ou bugs) avec propose_delete_item, mais uniquement pour des items que tu as bien identifiés au préalable via search_backlog ou get_item_details. N'appelle jamais propose_delete_item sur un identifiant que tu n'as pas vérifié au préalable dans la conversation.
+
+Quand tu présentes une liste de stories ou de bugs (par exemple sous forme de tableau Markdown), affiche toujours le nom lisible de la colonne de statut (champ statusColumn.name), jamais son identifiant technique (statusColumnId). Quand tu construis un tableau Markdown, sépare bien chaque en-tête de colonne par " | ", par exemple : "| Titre | Points | Statut |" suivi de la ligne de séparation "| --- | --- | --- |" — ne fusionne jamais deux en-têtes en un seul mot.`;
 
 const TOOLS: Anthropic.Tool[] = [
   {

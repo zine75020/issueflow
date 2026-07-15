@@ -61,6 +61,19 @@ modifier ou renommer un item existant — seulement propose_create_story (créat
 propose_reorder_backlog (réorganisation). Un outil propose_update_item serait à ajouter si
 ce besoin se présente.
 
+Backfill des embeddings en production (Turso) : effectué avec succès. Le script
+scripts/backfill-embeddings.mjs accepte désormais une cible Turso via --turso ou
+BACKFILL_TARGET=turso. 31 embeddings générés (19 stories, 7 bugs, 5 epics), 100% de
+couverture confirmée. Fix commité (08889df) et poussé sur le dépôt distant. La recherche
+sémantique (RAG) a été testée manuellement en production et fonctionne correctement.
+
+## En cours : bug d'affichage dans l'Assistant Backlog IA
+
+Correction en cours (non terminée, pas encore confirmée par test manuel utilisateur) :
+- Les réponses de l'agent montrant une liste de stories affichaient l'ID brut de la
+  colonne de statut au lieu de son nom lisible.
+- L'en-tête du tableau Markdown fusionnait par erreur les colonnes "Points" et "Statut".
+
 ## Prochaine priorité : polish visuel
 
 Passe de polish visuel sur l'ensemble de l'application (couleurs, hiérarchie des boutons,
