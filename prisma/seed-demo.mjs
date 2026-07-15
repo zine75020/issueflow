@@ -27,7 +27,7 @@
 //   SEED_TARGET=turso node prisma/seed-demo.mjs -> idem, via variable d'env
 
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -519,7 +519,7 @@ function printSummary({ canActivate, sprints, epics, stories, bugs }) {
   );
 }
 
-async function seedLocal() {
+export async function seedLocal() {
   const { default: Database } = await import("better-sqlite3");
   const db = new Database(path.join(__dirname, "..", "dev.db"));
 
@@ -593,7 +593,7 @@ async function seedLocal() {
   db.close();
 }
 
-async function seedTurso() {
+export async function seedTurso() {
   const { config } = await import("dotenv");
   config({ path: path.join(__dirname, "..", ".env.turso") });
 
@@ -703,8 +703,17 @@ async function seedTurso() {
   client.close();
 }
 
-if (target === "turso") {
-  await seedTurso();
-} else {
-  await seedLocal();
+// seedTurso/seedLocal sont exportées pour être réutilisées ailleurs (ex: la route de
+// reset quotidien de la démo, app/api/cron/reset-demo/route.ts). Ce bloc ne s'exécute
+// que lorsque le fichier est lancé directement en CLI (`node prisma/seed-demo.mjs`),
+// jamais lors d'un import.
+const isMainModule =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMainModule) {
+  if (target === "turso") {
+    await seedTurso();
+  } else {
+    await seedLocal();
+  }
 }

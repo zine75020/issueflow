@@ -16,32 +16,31 @@ export function buildEmbeddingText(itemType: ItemType, item: EmbeddableItem): st
   return parts.filter((part) => part && part.trim().length > 0).join("\n\n");
 }
 
-async function upsertEmbedding(
+/** Génère et enregistre l'embedding d'un item, en attendant le résultat (lève en cas d'échec). */
+export async function upsertEmbeddingNow(
   itemType: ItemType,
   itemId: string,
   text: string
 ): Promise<void> {
-  try {
-    const vector = await embedText(text, "document");
-    await prisma.embedding.upsert({
-      where: { itemType_itemId: { itemType, itemId } },
-      create: {
-        itemType,
-        itemId,
-        vector: JSON.stringify(vector),
-        model: VOYAGE_EMBEDDING_MODEL,
-      },
-      update: {
-        vector: JSON.stringify(vector),
-        model: VOYAGE_EMBEDDING_MODEL,
-      },
-    });
-  } catch (error) {
-    console.error(`Échec de la génération d'embedding pour ${itemType} ${itemId} :`, error);
-  }
+  const vector = await embedText(text, "document");
+  await prisma.embedding.upsert({
+    where: { itemType_itemId: { itemType, itemId } },
+    create: {
+      itemType,
+      itemId,
+      vector: JSON.stringify(vector),
+      model: VOYAGE_EMBEDDING_MODEL,
+    },
+    update: {
+      vector: JSON.stringify(vector),
+      model: VOYAGE_EMBEDDING_MODEL,
+    },
+  });
 }
 
 /** Lance la génération d'embedding en arrière-plan, sans bloquer la réponse HTTP appelante. */
 export function scheduleEmbedding(itemType: ItemType, itemId: string, text: string): void {
-  void upsertEmbedding(itemType, itemId, text);
+  void upsertEmbeddingNow(itemType, itemId, text).catch((error) => {
+    console.error(`Échec de la génération d'embedding pour ${itemType} ${itemId} :`, error);
+  });
 }

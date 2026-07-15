@@ -74,6 +74,32 @@ Correction en cours (non terminée, pas encore confirmée par test manuel utilis
   colonne de statut au lieu de son nom lisible.
 - L'en-tête du tableau Markdown fusionnait par erreur les colonnes "Points" et "Statut".
 
+## Reset quotidien de la base de démo (production)
+
+Le site étant public (zineboard.com) et testé par des recruteurs sans isolation par
+session, les modifications des visiteurs s'accumulent et se marchent dessus. Décision
+assumée : un reset simple et périodique de toute la base de démo, sans isolation par
+utilisateur.
+
+- Route `GET /api/cron/reset-demo` (app/api/cron/reset-demo/route.ts) : vide les tables
+  de contenu (Embedding, Story, Bug, Sprint, Epic, BoardColumn, dans cet ordre pour
+  respecter les contraintes de clé étrangère), relance la logique de
+  prisma/seed-demo.mjs (fonctions `seedTurso`/`seedLocal` désormais exportées et
+  réutilisables, cible Turso en production comme le script de backfill des embeddings),
+  puis régénère un embedding par item créé (séquentiel, ~31 items, ~10s).
+- Sécurisée par le header `Authorization: Bearer <CRON_SECRET>` : la route retourne 401
+  si absent ou incorrect. CRON_SECRET n'est pas généré automatiquement par Vercel — il
+  faut le créer soi-même (ex: `openssl rand -hex 32`) et le déclarer dans les
+  Environment Variables du projet Vercel ; une fois défini là-bas, Vercel l'envoie
+  automatiquement dans ce header sur chaque appel de cron.
+- Déclenchée une fois par jour à 3h du matin UTC via Vercel Cron (vercel.json,
+  schedule "0 3 * * *"), horaire creux pour minimiser l'impact sur des visiteurs en
+  cours de démo.
+- Testé manuellement de bout en bout contre la vraie base Turso de production : reset
+  et repeuplement corrects (5 epics, 19 stories, 7 bugs), 31 embeddings régénérés,
+  recherche sémantique (RAG) fonctionnelle sur les nouvelles données juste après reset,
+  rejouable sans erreur (testé deux fois consécutives).
+
 ## Prochaine priorité : polish visuel
 
 Passe de polish visuel sur l'ensemble de l'application (couleurs, hiérarchie des boutons,
