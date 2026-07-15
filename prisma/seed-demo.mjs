@@ -16,15 +16,26 @@
 // démo dédiée (pointer DATABASE_URL vers un autre fichier .db avant de
 // lancer ce script si on veut l'isoler de sa base de travail).
 //
-// Usage : node prisma/seed-demo.mjs
+// Cible : local (dev.db, comportement par défaut, inchangé) ou Turso
+// distant, sélectionnée via la variable d'environnement SEED_TARGET ou le
+// flag --turso. Les identifiants Turso sont lus dans .env.turso (jamais
+// dans .env), comme pour scripts/push-schema-to-turso.mjs.
+//
+// Usage :
+//   node prisma/seed-demo.mjs                 -> seed sur dev.db (local)
+//   node prisma/seed-demo.mjs --turso         -> seed sur Turso
+//   SEED_TARGET=turso node prisma/seed-demo.mjs -> idem, via variable d'env
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import Database from "better-sqlite3";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const db = new Database(path.join(__dirname, "..", "dev.db"));
+
+const target =
+  process.argv.includes("--turso") || process.env.SEED_TARGET === "turso"
+    ? "turso"
+    : "local";
 
 function isoDate(date) {
   return date.toISOString().replace("Z", "+00:00");
@@ -35,93 +46,6 @@ function addDays(date, days) {
   d.setUTCDate(d.getUTCDate() + days);
   return d;
 }
-
-// --- Garde anti-doublon ---
-const alreadySeeded = db
-  .prepare("SELECT id FROM Epic WHERE title = ?")
-  .get("Recherche produits");
-
-if (alreadySeeded) {
-  console.log(
-    'Les données de démo semblent déjà présentes (epic "Recherche produits" trouvé). Abandon pour éviter les doublons.'
-  );
-  db.close();
-  process.exit(0);
-}
-
-// --- Colonnes de board (doivent déjà exister, cf. prisma/seed.mjs) ---
-const columns = db
-  .prepare('SELECT id, name, "order", isLocked FROM BoardColumn ORDER BY "order" ASC')
-  .all();
-
-if (columns.length === 0) {
-  console.error(
-    "Aucune colonne de board trouvée. Lance d'abord `npx prisma db seed` pour créer les colonnes par défaut, puis relance ce script."
-  );
-  db.close();
-  process.exit(1);
-}
-
-const locked = columns.filter((c) => c.isLocked).sort((a, b) => a.order - b.order);
-const startColumn = locked[0];
-const endColumn = locked[locked.length - 1] ?? startColumn;
-const middleColumns = columns
-  .filter((c) => !c.isLocked)
-  .sort((a, b) => a.order - b.order);
-const inProgressColumn = middleColumns[0] ?? startColumn;
-const reviewColumn = middleColumns[1] ?? inProgressColumn;
-
-const COLS = {
-  start: startColumn.id,
-  inprogress: inProgressColumn.id,
-  review: reviewColumn.id,
-  end: endColumn.id,
-};
-
-// --- Contrainte "un seul sprint actif à la fois" ---
-const alreadyActive = db.prepare("SELECT id FROM Sprint WHERE isActive = 1").get();
-const canActivate = !alreadyActive;
-if (!canActivate) {
-  console.log(
-    'Un sprint est déjà actif dans cette base : le sprint de démo "actif" sera créé mais laissé inactif pour respecter la contrainte d\'un seul sprint actif à la fois.'
-  );
-}
-
-const now = new Date();
-
-const sprintDone = {
-  id: randomUUID(),
-  name: "Sprint 12 - Recherche & Paiement",
-  startDate: isoDate(addDays(now, -28)),
-  endDate: isoDate(addDays(now, -14)),
-  isActive: 0,
-  completedAt: isoDate(addDays(now, -14)),
-};
-
-const sprintActive = {
-  id: randomUUID(),
-  name: "Sprint 13 - Compte & Recommandations",
-  startDate: isoDate(addDays(now, -3)),
-  endDate: isoDate(addDays(now, 11)),
-  isActive: canActivate ? 1 : 0,
-  completedAt: null,
-};
-
-const sprintPlanned = {
-  id: randomUUID(),
-  name: "Sprint 14 - Sécurité & Avis",
-  startDate: isoDate(addDays(now, 14)),
-  endDate: isoDate(addDays(now, 28)),
-  isActive: 0,
-  completedAt: null,
-};
-
-const SPRINT = {
-  done: sprintDone.id,
-  active: sprintActive.id,
-  planned: sprintPlanned.id,
-  backlog: null,
-};
 
 const epicDefs = [
   {
@@ -149,7 +73,7 @@ const epicDefs = [
   },
 ];
 
-const stories = [
+const storyDefs = [
   // Recherche produits
   {
     epic: "Recherche produits",
@@ -408,7 +332,7 @@ const stories = [
   },
 ];
 
-const bugs = [
+const bugDefs = [
   {
     title: "Le prix affiché ne correspond pas au prix en caisse sur mobile",
     description:
@@ -476,40 +400,83 @@ const bugs = [
   },
 ];
 
-const seed = db.transaction(() => {
-  const insertSprint = db.prepare(
-    `INSERT INTO Sprint (id, name, startDate, endDate, isActive, completedAt, createdAt)
-     VALUES (@id, @name, @startDate, @endDate, @isActive, @completedAt, @createdAt)`
-  );
-  for (const s of [sprintDone, sprintActive, sprintPlanned]) {
-    insertSprint.run({ ...s, createdAt: isoDate(now) });
-  }
+// Construit toutes les lignes à insérer à partir de l'état déjà présent en base
+// (colonnes de board, sprint actif éventuel, position de backlog courante).
+// Pure : ne dépend d'aucune connexion DB, réutilisable pour local et Turso.
+function buildSeedPlan({ columns, alreadyActiveSprintExists, maxStoryPos, maxBugPos }) {
+  const locked = columns.filter((c) => c.isLocked).sort((a, b) => a.order - b.order);
+  const startColumn = locked[0];
+  const endColumn = locked[locked.length - 1] ?? startColumn;
+  const middleColumns = columns
+    .filter((c) => !c.isLocked)
+    .sort((a, b) => a.order - b.order);
+  const inProgressColumn = middleColumns[0] ?? startColumn;
+  const reviewColumn = middleColumns[1] ?? inProgressColumn;
 
-  const insertEpic = db.prepare(
-    `INSERT INTO Epic (id, title, description, status, createdAt, updatedAt)
-     VALUES (@id, @title, @description, 'TODO', @createdAt, @updatedAt)`
-  );
+  const COLS = {
+    start: startColumn.id,
+    inprogress: inProgressColumn.id,
+    review: reviewColumn.id,
+    end: endColumn.id,
+  };
+
+  const canActivate = !alreadyActiveSprintExists;
+  const now = new Date();
+
+  const sprintDone = {
+    id: randomUUID(),
+    name: "Sprint 12 - Recherche & Paiement",
+    startDate: isoDate(addDays(now, -28)),
+    endDate: isoDate(addDays(now, -14)),
+    isActive: 0,
+    completedAt: isoDate(addDays(now, -14)),
+    createdAt: isoDate(now),
+  };
+
+  const sprintActive = {
+    id: randomUUID(),
+    name: "Sprint 13 - Compte & Recommandations",
+    startDate: isoDate(addDays(now, -3)),
+    endDate: isoDate(addDays(now, 11)),
+    isActive: canActivate ? 1 : 0,
+    completedAt: null,
+    createdAt: isoDate(now),
+  };
+
+  const sprintPlanned = {
+    id: randomUUID(),
+    name: "Sprint 14 - Sécurité & Avis",
+    startDate: isoDate(addDays(now, 14)),
+    endDate: isoDate(addDays(now, 28)),
+    isActive: 0,
+    completedAt: null,
+    createdAt: isoDate(now),
+  };
+
+  const SPRINT = {
+    done: sprintDone.id,
+    active: sprintActive.id,
+    planned: sprintPlanned.id,
+    backlog: null,
+  };
+
   const epicIds = {};
-  for (const e of epicDefs) {
+  const epics = epicDefs.map((e) => {
     const id = randomUUID();
     epicIds[e.title] = id;
-    insertEpic.run({
+    return {
       id,
       title: e.title,
       description: e.description,
       createdAt: isoDate(now),
       updatedAt: isoDate(now),
-    });
-  }
+    };
+  });
 
-  const insertStory = db.prepare(
-    `INSERT INTO Story (id, title, description, acceptanceCriteria, storyPoints, remainingEffort, statusColumnId, epicId, sprintId, backlogPosition, createdAt, updatedAt)
-     VALUES (@id, @title, @description, @acceptanceCriteria, @storyPoints, @remainingEffort, @statusColumnId, @epicId, @sprintId, @backlogPosition, @createdAt, @updatedAt)`
-  );
-  let storyPos = db.prepare("SELECT MAX(backlogPosition) as m FROM Story").get().m ?? 0;
-  for (const s of stories) {
+  let storyPos = maxStoryPos ?? 0;
+  const stories = storyDefs.map((s) => {
     storyPos += 1;
-    insertStory.run({
+    return {
       id: randomUUID(),
       title: s.title,
       description: s.description,
@@ -522,17 +489,13 @@ const seed = db.transaction(() => {
       backlogPosition: storyPos,
       createdAt: isoDate(now),
       updatedAt: isoDate(now),
-    });
-  }
+    };
+  });
 
-  const insertBug = db.prepare(
-    `INSERT INTO Bug (id, title, description, severity, remainingEffort, statusColumnId, sprintId, backlogPosition, createdAt, updatedAt)
-     VALUES (@id, @title, @description, @severity, @remainingEffort, @statusColumnId, @sprintId, @backlogPosition, @createdAt, @updatedAt)`
-  );
-  let bugPos = db.prepare("SELECT MAX(backlogPosition) as m FROM Bug").get().m ?? 0;
-  for (const b of bugs) {
+  let bugPos = maxBugPos ?? 0;
+  const bugs = bugDefs.map((b) => {
     bugPos += 1;
-    insertBug.run({
+    return {
       id: randomUUID(),
       title: b.title,
       description: b.description,
@@ -543,14 +506,205 @@ const seed = db.transaction(() => {
       backlogPosition: bugPos,
       createdAt: isoDate(now),
       updatedAt: isoDate(now),
-    });
+    };
+  });
+
+  return { canActivate, sprints: [sprintDone, sprintActive, sprintPlanned], epics, stories, bugs };
+}
+
+function printSummary({ canActivate, sprints, epics, stories, bugs }) {
+  const [sprintDone, sprintActive, sprintPlanned] = sprints;
+  console.log(
+    `Démo e-commerce injectée : ${epics.length} epics, ${stories.length} stories, ${bugs.length} bugs, 3 sprints (${sprintDone.name} - terminé, ${sprintActive.name} - ${canActivate ? "actif" : "inactif car un autre sprint est déjà actif"}, ${sprintPlanned.name} - planifié).`
+  );
+}
+
+async function seedLocal() {
+  const { default: Database } = await import("better-sqlite3");
+  const db = new Database(path.join(__dirname, "..", "dev.db"));
+
+  const alreadySeeded = db
+    .prepare("SELECT id FROM Epic WHERE title = ?")
+    .get("Recherche produits");
+
+  if (alreadySeeded) {
+    console.log(
+      'Les données de démo semblent déjà présentes en local (epic "Recherche produits" trouvé). Abandon pour éviter les doublons.'
+    );
+    db.close();
+    return;
   }
-});
 
-seed();
+  const columns = db
+    .prepare('SELECT id, name, "order", isLocked FROM BoardColumn ORDER BY "order" ASC')
+    .all();
 
-console.log(
-  `Démo e-commerce injectée : ${epicDefs.length} epics, ${stories.length} stories, ${bugs.length} bugs, 3 sprints (${sprintDone.name} - terminé, ${sprintActive.name} - ${canActivate ? "actif" : "inactif car un autre sprint est déjà actif"}, ${sprintPlanned.name} - planifié).`
-);
+  if (columns.length === 0) {
+    console.error(
+      "Aucune colonne de board trouvée. Lance d'abord `npx prisma db seed` pour créer les colonnes par défaut, puis relance ce script."
+    );
+    db.close();
+    process.exitCode = 1;
+    return;
+  }
 
-db.close();
+  const alreadyActiveSprintExists = !!db
+    .prepare("SELECT id FROM Sprint WHERE isActive = 1")
+    .get();
+  if (alreadyActiveSprintExists) {
+    console.log(
+      'Un sprint est déjà actif dans cette base : le sprint de démo "actif" sera créé mais laissé inactif pour respecter la contrainte d\'un seul sprint actif à la fois.'
+    );
+  }
+
+  const maxStoryPos = db.prepare("SELECT MAX(backlogPosition) as m FROM Story").get().m ?? 0;
+  const maxBugPos = db.prepare("SELECT MAX(backlogPosition) as m FROM Bug").get().m ?? 0;
+
+  const plan = buildSeedPlan({ columns, alreadyActiveSprintExists, maxStoryPos, maxBugPos });
+
+  const seed = db.transaction(() => {
+    const insertSprint = db.prepare(
+      `INSERT INTO Sprint (id, name, startDate, endDate, isActive, completedAt, createdAt)
+       VALUES (@id, @name, @startDate, @endDate, @isActive, @completedAt, @createdAt)`
+    );
+    for (const s of plan.sprints) insertSprint.run(s);
+
+    const insertEpic = db.prepare(
+      `INSERT INTO Epic (id, title, description, status, createdAt, updatedAt)
+       VALUES (@id, @title, @description, 'TODO', @createdAt, @updatedAt)`
+    );
+    for (const e of plan.epics) insertEpic.run(e);
+
+    const insertStory = db.prepare(
+      `INSERT INTO Story (id, title, description, acceptanceCriteria, storyPoints, remainingEffort, statusColumnId, epicId, sprintId, backlogPosition, createdAt, updatedAt)
+       VALUES (@id, @title, @description, @acceptanceCriteria, @storyPoints, @remainingEffort, @statusColumnId, @epicId, @sprintId, @backlogPosition, @createdAt, @updatedAt)`
+    );
+    for (const s of plan.stories) insertStory.run(s);
+
+    const insertBug = db.prepare(
+      `INSERT INTO Bug (id, title, description, severity, remainingEffort, statusColumnId, sprintId, backlogPosition, createdAt, updatedAt)
+       VALUES (@id, @title, @description, @severity, @remainingEffort, @statusColumnId, @sprintId, @backlogPosition, @createdAt, @updatedAt)`
+    );
+    for (const b of plan.bugs) insertBug.run(b);
+  });
+
+  seed();
+  printSummary(plan);
+  db.close();
+}
+
+async function seedTurso() {
+  const { config } = await import("dotenv");
+  config({ path: path.join(__dirname, "..", ".env.turso") });
+
+  if (!process.env.DATABASE_URL || !process.env.TOKEN_DATABASE) {
+    console.error(
+      "DATABASE_URL et TOKEN_DATABASE doivent être définis dans .env.turso pour seeder Turso."
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const { createClient } = await import("@libsql/client");
+  const client = createClient({
+    url: process.env.DATABASE_URL,
+    authToken: process.env.TOKEN_DATABASE,
+  });
+
+  const existing = await client.execute({
+    sql: "SELECT id FROM Epic WHERE title = ?",
+    args: ["Recherche produits"],
+  });
+  if (existing.rows.length > 0) {
+    console.log(
+      'Les données de démo semblent déjà présentes sur Turso (epic "Recherche produits" trouvé). Abandon pour éviter les doublons.'
+    );
+    client.close();
+    return;
+  }
+
+  let columnsRes = await client.execute(
+    'SELECT id, name, "order", isLocked FROM BoardColumn ORDER BY "order" ASC;'
+  );
+  let columns = columnsRes.rows;
+
+  if (columns.length === 0) {
+    // Équivalent de `npx prisma db seed` (prisma/seed.mjs), qui ne peut pas cibler
+    // Turso via la CLI (même limitation que pour les migrations). On crée donc ici
+    // les 3 colonnes de board par défaut avant d'injecter les données de démo.
+    console.log("Aucune colonne de board sur Turso : création des 3 colonnes par défaut.");
+    await client.batch(
+      [
+        {
+          sql: 'INSERT INTO BoardColumn (id, name, "order", isLocked) VALUES (@id, @name, @order, @isLocked)',
+          args: { id: randomUUID(), name: "À faire", order: 0, isLocked: 1 },
+        },
+        {
+          sql: 'INSERT INTO BoardColumn (id, name, "order", isLocked) VALUES (@id, @name, @order, @isLocked)',
+          args: { id: randomUUID(), name: "En cours", order: 1, isLocked: 0 },
+        },
+        {
+          sql: 'INSERT INTO BoardColumn (id, name, "order", isLocked) VALUES (@id, @name, @order, @isLocked)',
+          args: { id: randomUUID(), name: "Terminé", order: 2, isLocked: 1 },
+        },
+      ],
+      "write"
+    );
+    columnsRes = await client.execute(
+      'SELECT id, name, "order", isLocked FROM BoardColumn ORDER BY "order" ASC;'
+    );
+    columns = columnsRes.rows;
+  }
+
+  const activeSprintRes = await client.execute(
+    "SELECT id FROM Sprint WHERE isActive = 1;"
+  );
+  const alreadyActiveSprintExists = activeSprintRes.rows.length > 0;
+  if (alreadyActiveSprintExists) {
+    console.log(
+      'Un sprint est déjà actif sur Turso : le sprint de démo "actif" sera créé mais laissé inactif pour respecter la contrainte d\'un seul sprint actif à la fois.'
+    );
+  }
+
+  const maxStoryRes = await client.execute(
+    "SELECT MAX(backlogPosition) as m FROM Story;"
+  );
+  const maxBugRes = await client.execute("SELECT MAX(backlogPosition) as m FROM Bug;");
+  const maxStoryPos = maxStoryRes.rows[0]?.m ?? 0;
+  const maxBugPos = maxBugRes.rows[0]?.m ?? 0;
+
+  const plan = buildSeedPlan({ columns, alreadyActiveSprintExists, maxStoryPos, maxBugPos });
+
+  const statements = [
+    ...plan.sprints.map((s) => ({
+      sql: `INSERT INTO Sprint (id, name, startDate, endDate, isActive, completedAt, createdAt)
+            VALUES (@id, @name, @startDate, @endDate, @isActive, @completedAt, @createdAt)`,
+      args: s,
+    })),
+    ...plan.epics.map((e) => ({
+      sql: `INSERT INTO Epic (id, title, description, status, createdAt, updatedAt)
+            VALUES (@id, @title, @description, 'TODO', @createdAt, @updatedAt)`,
+      args: e,
+    })),
+    ...plan.stories.map((s) => ({
+      sql: `INSERT INTO Story (id, title, description, acceptanceCriteria, storyPoints, remainingEffort, statusColumnId, epicId, sprintId, backlogPosition, createdAt, updatedAt)
+            VALUES (@id, @title, @description, @acceptanceCriteria, @storyPoints, @remainingEffort, @statusColumnId, @epicId, @sprintId, @backlogPosition, @createdAt, @updatedAt)`,
+      args: s,
+    })),
+    ...plan.bugs.map((b) => ({
+      sql: `INSERT INTO Bug (id, title, description, severity, remainingEffort, statusColumnId, sprintId, backlogPosition, createdAt, updatedAt)
+            VALUES (@id, @title, @description, @severity, @remainingEffort, @statusColumnId, @sprintId, @backlogPosition, @createdAt, @updatedAt)`,
+      args: b,
+    })),
+  ];
+
+  await client.batch(statements, "write");
+  printSummary(plan);
+  client.close();
+}
+
+if (target === "turso") {
+  await seedTurso();
+} else {
+  await seedLocal();
+}

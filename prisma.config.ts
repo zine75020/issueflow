@@ -3,6 +3,11 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+// Le schema engine de la CLI Prisma (migrate dev/deploy, db push, studio...) ne sait pas
+// se connecter à un datasource libsql:// : ça ne passe que par un adaptateur driver, qui
+// n'existe qu'au runtime du client (voir lib/prisma.ts). La CLI reste donc toujours sur le
+// fichier SQLite local ; pousser le schéma vers Turso se fait via
+// scripts/push-schema-to-turso.mjs (npm run db:push-to-turso), pas via cette config.
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
@@ -10,6 +15,6 @@ export default defineConfig({
     seed: "node prisma/seed.mjs",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: "file:./dev.db",
   },
 });
