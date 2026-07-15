@@ -7,6 +7,8 @@ import { labelForTool } from "@/lib/agentTypes";
 import type { AgentChatMessage, AgentChatResponse, AgentProposal, AgentStep } from "@/lib/agentTypes";
 import type { Epic, Story } from "@/lib/types";
 import { ProposalCard, type ProposalStatus } from "@/components/agent/ProposalCard";
+import { AgentMarkdown } from "@/components/agent/AgentMarkdown";
+import { useColumns } from "@/lib/useColumns";
 
 type ChatTurn =
   | { id: string; role: "user"; text: string }
@@ -25,6 +27,15 @@ function makeId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+const TEXTAREA_MAX_HEIGHT_PX = 160; // ~7 lignes avant scroll interne
+
+const DEFAULT_PANEL_WIDTH_PX = 440;
+const MIN_PANEL_WIDTH_PX = 360;
+
+function getMaxPanelWidthPx() {
+  return Math.min(900, window.innerWidth * 0.6);
+}
+
 export function AssistantPanel({ onClose }: { onClose: () => void }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [apiMessages, setApiMessages] = useState<AgentChatMessage[]>([]);
@@ -33,8 +44,13 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
   const [proposalState, setProposalState] = useState<Record<string, ProposalUiState>>({});
   const [epics, setEpics] = useState<Epic[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
+  const { columns } = useColumns();
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH_PX);
+  const [isResizing, setIsResizing] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const resizeStartRef = useRef({ startX: 0, startWidth: DEFAULT_PANEL_WIDTH_PX });
 
   useEffect(() => {
     let cancelled = false;
@@ -69,8 +85,50 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [turns, loading]);
 
-  async function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)}px`;
+  }, [input]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+    document.body.style.cursor = "col-resize";
+    return () => {
+      document.body.style.cursor = "";
+    };
+  }, [isResizing]);
+
+  useEffect(() => {
+    function handleWindowResize() {
+      setPanelWidth((w) => Math.min(w, getMaxPanelWidthPx()));
+    }
+    window.addEventListener("resize", handleWindowResize);
+    return () => window.removeEventListener("resize", handleWindowResize);
+  }, []);
+
+  function handleResizeStart(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault();
+    resizeStartRef.current = { startX: e.clientX, startWidth: panelWidth };
+    setIsResizing(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handleResizeMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!isResizing) return;
+    const { startX, startWidth } = resizeStartRef.current;
+    const desired = startWidth + (startX - e.clientX);
+    const clamped = Math.min(Math.max(desired, MIN_PANEL_WIDTH_PX), getMaxPanelWidthPx());
+    setPanelWidth(clamped);
+  }
+
+  function handleResizeEnd(e: React.PointerEvent<HTMLDivElement>) {
+    setIsResizing(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  }
+
+  async function sendMessage() {
     const text = input.trim();
     if (!text || loading) return;
 
@@ -147,7 +205,7 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
         if (!res.ok) {
           throw new Error(data.error ?? "Erreur lors de la création de la story.");
         }
-      } else {
+      } else if (proposal.type === "reorder_backlog") {
         const res = await fetch("/api/stories/reorder", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -156,6 +214,15 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
         const data = await res.json();
         if (!res.ok) {
           throw new Error(data.error ?? "Erreur lors de la réorganisation du backlog.");
+        }
+      } else {
+        const routeSegment = proposal.itemType === "story" ? "stories" : "bugs";
+        const res = await fetch(`/api/${routeSegment}/${proposal.itemId}`, {
+          method: "DELETE",
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error ?? "Erreur lors de la suppression de l'item.");
         }
       }
 
@@ -178,7 +245,22 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-y-0 right-0 z-40 flex w-full sm:w-[440px] max-w-full flex-col border-l border-border bg-surface shadow-xl">
+    <div
+      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-full flex-col border-l border-border bg-surface shadow-xl sm:w-(--panel-width)"
+      style={{ "--panel-width": `${panelWidth}px` } as React.CSSProperties}
+    >
+      <div
+        onPointerDown={handleResizeStart}
+        onPointerMove={handleResizeMove}
+        onPointerUp={handleResizeEnd}
+        className={`absolute left-0 top-0 bottom-0 z-10 hidden w-1.5 -translate-x-1/2 cursor-col-resize touch-none transition-colors sm:block ${
+          isResizing ? "bg-accent" : "bg-transparent hover:bg-accent/50"
+        }`}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Redimensionner le panneau"
+      />
+
       <div className="flex items-center justify-between border-b border-border px-4 py-3 shrink-0">
         <div className="flex items-center gap-2">
           <SparkleIcon className="h-4 w-4 text-accent" />
@@ -216,13 +298,13 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
           return (
             <div key={turn.id} className="flex flex-col gap-2">
               <div
-                className={`max-w-[92%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                className={`max-w-[92%] rounded-lg px-3 py-2 ${
                   turn.isError
-                    ? "border border-severity-critical text-severity-critical bg-surface-2"
+                    ? "border border-severity-critical text-severity-critical bg-surface-2 text-sm whitespace-pre-wrap"
                     : "bg-surface-2"
                 }`}
               >
-                {turn.text}
+                {turn.isError ? turn.text : <AgentMarkdown text={turn.text} />}
               </div>
 
               {turn.steps.length > 0 && (
@@ -248,6 +330,7 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
                     error={state.error}
                     epics={epics}
                     stories={stories}
+                    columns={columns}
                     onAccept={() => handleAccept(key, proposal)}
                     onReject={() => handleReject(key)}
                   />
@@ -269,19 +352,34 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-border p-3 flex gap-2 shrink-0">
-        <input
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          sendMessage();
+        }}
+        className="border-t border-border p-3 flex gap-2 items-end shrink-0"
+      >
+        <textarea
+          ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Écris ta question…"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
+          placeholder="Écris ta question… (Maj+Entrée pour un saut de ligne)"
           disabled={loading}
-          className="input flex-1"
+          rows={1}
+          className="input flex-1 resize-none overflow-y-auto"
+          style={{ maxHeight: TEXTAREA_MAX_HEIGHT_PX }}
         />
         <button
           type="submit"
           disabled={loading || !input.trim()}
           aria-label="Envoyer"
-          className="btn-primary !px-3"
+          className="btn-primary !px-3 !py-2.5"
         >
           <SendIcon className="h-4 w-4" />
         </button>

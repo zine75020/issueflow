@@ -36,32 +36,35 @@ Lis aussi issueflow-spec.md pour le détail des user stories et critères d'acce
 - Base de données peuplée avec un jeu de données de démo réaliste (thème e-commerce) via
   prisma/seed-demo.mjs, en plus des données de test de l'utilisateur.
 
-## Prochaine priorité : Assistant Backlog IA (agent + RAG)
+## Assistant Backlog IA (agent + RAG) — terminé et fonctionnel
 
-Objectif : un vrai agent conversationnel avec tool use (pas un simple appel LLM), pour
-démontrer une architecture IA sérieuse.
+Agent conversationnel avec tool use réel (API Anthropic, modèle claude-sonnet-5), pas un
+simple appel LLM :
+- RAG fonctionnel pour la recherche sémantique : embeddings Voyage AI (voyage-4-lite),
+  stockés en base (modèle Embedding), recherche par similarité cosinus via
+  GET /api/search. Backfill effectué.
+- 4 outils (tool use) : search_backlog (RAG), get_item_details (lecture) exécutés
+  automatiquement ; propose_create_story et propose_reorder_backlog qui n'écrivent jamais
+  directement en base — ils retournent une proposition structurée.
+- Boucle agentique côté backend (POST /api/agent/chat), plafonnée à 5 itérations.
+- Human-in-the-loop strict : toute proposition de création ou de réorganisation est
+  affichée dans l'UI sous forme de carte dédiée avec boutons Valider/Refuser ; aucune
+  écriture en base sans validation explicite de l'utilisateur.
+- UI : panneau latéral ("Assistant Backlog") accessible depuis un bouton dédié dans le
+  header, historique de conversation, indicateur de chargement pendant le traitement puis
+  résumé discret des étapes utilisées, cartes de proposition.
+- Testé de bout en bout dans un navigateur réel : recherche sémantique, création de story
+  validée (apparaît bien dans le Product Backlog), proposition refusée (n'écrit rien).
 
-Architecture cible :
-- Un panneau de chat dédié ("Assistant Backlog"), affichant les étapes de raisonnement de
-  l'agent de façon visible (ex: "Recherche dans le backlog...", "Proposition : ...").
-- L'agent dispose de plusieurs outils (tool use API Anthropic) qu'il choisit d'appeler en
-  autonomie selon la demande : search_backlog (recherche sémantique RAG), create_story,
-  reorder_backlog, get_item_details. Il peut enchaîner plusieurs appels d'outils avant de
-  répondre.
-- RAG réel pour search_backlog : embeddings via Voyage AI (voyage-4-lite), stockés en base
-  (nouveau modèle Embedding), recherche par similarité cosinus.
-- Human-in-the-loop strict : toute action d'écriture (création, réorganisation) est
-  présentée comme une proposition, jamais exécutée sans validation explicite de
-  l'utilisateur dans l'UI.
-- Clés nécessaires dans .env : VOYAGE_API_KEY (déjà présente), ANTHROPIC_API_KEY (à ajouter
-  par l'utilisateur, pas encore présente), et le SDK @anthropic-ai/sdk à installer (pas
-  encore dans package.json).
+Limite connue (amélioration future si souhaité) : l'agent ne dispose d'aucun outil pour
+modifier ou renommer un item existant — seulement propose_create_story (création) et
+propose_reorder_backlog (réorganisation). Un outil propose_update_item serait à ajouter si
+ce besoin se présente.
 
-Étape en cours : génération et stockage des embeddings (schéma + backfill), avant de
-construire la recherche sémantique puis l'agent lui-même.
+## Prochaine priorité : polish visuel
 
-Passe de polish visuel (couleurs, hiérarchie des boutons, mise en valeur) une fois
-l'assistant IA en place.
+Passe de polish visuel sur l'ensemble de l'application (couleurs, hiérarchie des boutons,
+mise en valeur) — dernière étape avant la démo finale.
 
 ## Dette technique connue (non bloquante)
 - Le champ "Remaining Effort" est actuellement contraint à l'échelle Fibonacci comme les

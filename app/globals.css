@@ -178,3 +178,58 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Rendu Markdown des messages de l'assistant */
+.markdown > :first-child {
+  margin-top: 0;
+}
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+.markdown p {
+  margin: 0.5em 0;
+}
+.markdown strong {
+  font-weight: 600;
+}
+.markdown ul,
+.markdown ol {
+  margin: 0.5em 0;
+  padding-left: 1.25em;
+}
+.markdown ul {
+  list-style: disc;
+}
+.markdown ol {
+  list-style: decimal;
+}
+.markdown li {
+  margin: 0.15em 0;
+}
+.markdown li > p {
+  margin: 0;
+}
+.markdown code {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  padding: 0.05em 0.35em;
+  font-size: 0.85em;
+}
+.markdown pre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5em 0.75em;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.markdown pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+}

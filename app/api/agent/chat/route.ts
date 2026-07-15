@@ -8,7 +8,9 @@ const SYSTEM_PROMPT = `Tu es l'Assistant Backlog de ZineBoard, un outil de gesti
 
 Tu aides l'utilisateur à explorer et faire évoluer son backlog (epics, stories, bugs). Avant de répondre à une question sur le contenu du backlog, cherche l'information avec l'outil search_backlog plutôt que de deviner. Utilise get_item_details quand tu as besoin des détails complets d'un item précis (par exemple après une recherche, pour vérifier son contenu avant de proposer une modification).
 
-Tu ne peux JAMAIS créer, modifier ou réorganiser quoi que ce soit directement. Les outils propose_create_story et propose_reorder_backlog ne font qu'enregistrer une proposition structurée : c'est l'utilisateur qui doit explicitement valider cette proposition dans l'interface avant qu'une quelconque écriture ait lieu en base de données. Ne dis jamais que tu as "créé" une story ou "réorganisé" le backlog — dis que tu proposes cette action et qu'elle attend la validation de l'utilisateur.`;
+Tu ne peux JAMAIS créer, modifier, supprimer ou réorganiser quoi que ce soit directement. Les outils propose_create_story, propose_reorder_backlog et propose_delete_item ne font qu'enregistrer une proposition structurée : c'est l'utilisateur qui doit explicitement valider cette proposition dans l'interface avant qu'une quelconque écriture ait lieu en base de données. Ne dis jamais que tu as "créé" une story, "réorganisé" le backlog ou "supprimé" un item — dis que tu proposes cette action et qu'elle attend la validation de l'utilisateur.
+
+Tu peux proposer la suppression d'un ou plusieurs items (stories ou bugs) avec propose_delete_item, mais uniquement pour des items que tu as bien identifiés au préalable via search_backlog ou get_item_details. N'appelle jamais propose_delete_item sur un identifiant que tu n'as pas vérifié au préalable dans la conversation.`;
 
 const TOOLS: Anthropic.Tool[] = [
   {
@@ -84,6 +86,23 @@ const TOOLS: Anthropic.Tool[] = [
       required: ["instructions", "affectedItemIds"],
     },
   },
+  {
+    name: "propose_delete_item",
+    description:
+      "Propose la suppression d'une story ou d'un bug déjà identifié (via search_backlog ou get_item_details). N'écrit RIEN en base : retourne une proposition structurée que l'utilisateur devra valider explicitement dans l'interface avant toute suppression réelle.",
+    input_schema: {
+      type: "object",
+      properties: {
+        itemType: { type: "string", enum: ["story", "bug"] },
+        itemId: { type: "string", description: "Identifiant de l'item à supprimer." },
+        reason: {
+          type: "string",
+          description: "Optionnel. Raison de la suppression proposée, à afficher à l'utilisateur.",
+        },
+      },
+      required: ["itemType", "itemId"],
+    },
+  },
 ];
 
 const ITEM_TYPE_ROUTE: Record<string, string> = {
@@ -111,6 +130,18 @@ type Proposal =
       type: "reorder_backlog";
       instructions: string;
       affectedItemIds: string[];
+    }
+  | {
+      type: "delete_item";
+      itemType: "story" | "bug";
+      itemId: string;
+      reason?: string;
+      itemSnapshot: {
+        title: string;
+        statusColumnId?: string;
+        severity?: string;
+        storyPoints?: number | null;
+      };
     };
 
 async function runSearchBacklog(
@@ -150,6 +181,7 @@ function buildResultSummary(
     }
     case "propose_create_story":
     case "propose_reorder_backlog":
+    case "propose_delete_item":
       return "Proposition enregistrée";
     default:
       return undefined;
@@ -281,6 +313,54 @@ export async function POST(request: NextRequest) {
                 status: "proposition_enregistrée",
                 proposal,
                 note: "Le backlog n'a pas été réorganisé. Cette proposition attend la validation de l'utilisateur dans l'interface.",
+              },
+              isError: false,
+            };
+            break;
+          }
+          case "propose_delete_item": {
+            const itemType = input.itemType === "story" || input.itemType === "bug" ? input.itemType : null;
+            const itemId = typeof input.itemId === "string" ? input.itemId : "";
+
+            if (!itemType || !itemId) {
+              toolResult = {
+                result: "itemType doit être 'story' ou 'bug', et itemId est obligatoire.",
+                isError: true,
+              };
+              break;
+            }
+
+            const details = await runGetItemDetails(origin, { itemType, itemId });
+            const item = details.result as Record<string, unknown> | null;
+
+            if (details.isError || !item || typeof item !== "object") {
+              toolResult = {
+                result: `Item introuvable (${itemType} ${itemId}). Vérifie l'identifiant avec search_backlog ou get_item_details avant de proposer une suppression.`,
+                isError: true,
+              };
+              break;
+            }
+
+            const proposal: Proposal = {
+              type: "delete_item",
+              itemType,
+              itemId,
+              ...(typeof input.reason === "string" && input.reason ? { reason: input.reason } : {}),
+              itemSnapshot: {
+                title: String(item.title ?? ""),
+                ...(typeof item.statusColumnId === "string" ? { statusColumnId: item.statusColumnId } : {}),
+                ...(typeof item.severity === "string" ? { severity: item.severity } : {}),
+                ...(item.storyPoints !== undefined
+                  ? { storyPoints: item.storyPoints as number | null }
+                  : {}),
+              },
+            };
+            proposals.push(proposal);
+            toolResult = {
+              result: {
+                status: "proposition_enregistrée",
+                proposal,
+                note: "Cet item n'a pas été supprimé. Cette proposition attend la validation de l'utilisateur dans l'interface.",
               },
               isError: false,
             };
