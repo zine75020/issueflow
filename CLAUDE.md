@@ -67,14 +67,31 @@ BACKFILL_TARGET=turso. 31 embeddings générés (19 stories, 7 bugs, 5 epics), 1
 couverture confirmée. Fix commité (08889df) et poussé sur le dépôt distant. La recherche
 sémantique (RAG) a été testée manuellement en production et fonctionne correctement.
 
-## En cours : bug d'affichage dans l'Assistant Backlog IA
+## Bugs d'affichage de l'Assistant Backlog IA — résolus et confirmés
 
-Correction en cours (non terminée, pas encore confirmée par test manuel utilisateur) :
-- Les réponses de l'agent montrant une liste de stories affichaient l'ID brut de la
-  colonne de statut au lieu de son nom lisible.
-- L'en-tête du tableau Markdown fusionnait par erreur les colonnes "Points" et "Statut".
+Deux bugs distincts dans les réponses de l'agent listant des stories/bugs, corrigés et
+confirmés par test manuel utilisateur :
+- L'ID brut de la colonne de statut (ex: "35b2...") s'affichait au lieu de son nom
+  lisible ("Review", "À faire", etc.) — cause : `searchBacklog`/`getStoryById`/
+  `getBugById` ne chargeaient pas la relation `statusColumn`, l'agent n'avait donc pas
+  accès au nom. Fix : inclusion de la relation + consigne dans le prompt système pour
+  utiliser `statusColumn.name` plutôt que l'ID.
+- Les en-têtes de colonnes adjacentes du tableau Markdown généré s'affichaient collés
+  (ex: "PointsStatut", "MINEUR En cours") — cause réelle : Tailwind (preflight) applique
+  `border-collapse: collapse` sur les tables sans que le bloc `.markdown` ne redéfinisse
+  de padding/bordure pour `th`/`td` ; le Markdown généré par le LLM et le parsing GFM
+  (react-markdown + remark-gfm) étaient corrects depuis le départ. Fix : ajout de styles
+  `.markdown table/th/td` (bordure, padding, fond d'en-tête) dans app/globals.css.
 
-## Reset quotidien de la base de démo (production)
+## Domaine et déploiement
+
+Nom de domaine zineboard.com connecté et actif sur Vercel (avec redirection 308 de
+l'apex zineboard.com vers www.zineboard.com — à garder en tête pour tout test manuel
+avec curl : `curl -L` supprime le header Authorization en suivant une redirection vers
+un autre host, donc toujours tester directement sur www.zineboard.com plutôt que sur
+l'apex avec `-L`).
+
+## Reset quotidien de la base de démo (production) — en place et testé avec succès
 
 Le site étant public (zineboard.com) et testé par des recruteurs sans isolation par
 session, les modifications des visiteurs s'accumulent et se marchent dessus. Décision
@@ -99,6 +116,10 @@ utilisateur.
   et repeuplement corrects (5 epics, 19 stories, 7 bugs), 31 embeddings régénérés,
   recherche sémantique (RAG) fonctionnelle sur les nouvelles données juste après reset,
   rejouable sans erreur (testé deux fois consécutives).
+- Faux problème d'authentification rencontré puis résolu : le 401 systématique observé
+  en test manuel venait de la redirection de domaine décrite ci-dessus (curl -L
+  supprimait le header Authorization), pas d'un bug de comparaison du secret. Confirmé
+  résolu par test manuel de l'utilisateur sur le bon domaine.
 
 ## Prochaine priorité : polish visuel
 
