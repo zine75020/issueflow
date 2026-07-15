@@ -17,10 +17,20 @@ export const maxDuration = 60;
  * (voir vercel.json) avec le header Authorization: Bearer <CRON_SECRET>.
  */
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = process.env.CRON_SECRET?.trim();
   const authHeader = request.headers.get("authorization");
+  const receivedToken = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
 
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  // Diagnostic temporaire (retirer une fois le 401 en prod résolu) : ne logue que des
+  // longueurs, jamais les valeurs, pour détecter un espace/retour à la ligne en trop
+  // ou une troncature sans exposer le secret.
+  console.log(
+    `[reset-demo auth] header présent: ${authHeader !== null}, longueur token reçu: ${
+      receivedToken?.length ?? "n/a"
+    }, longueur CRON_SECRET configuré: ${cronSecret?.length ?? "n/a"}`
+  );
+
+  if (!cronSecret || receivedToken !== cronSecret) {
     return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   }
 
