@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { searchBacklog, getItemDetails, VoyageError, type BacklogItemType } from "@/lib/backlog-queries";
+import { ItemType } from "@/app/generated/prisma/client";
 
 const MODEL = "claude-sonnet-5";
 const MAX_ITERATIONS = 5;
@@ -105,11 +107,7 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-const ITEM_TYPE_ROUTE: Record<string, string> = {
-  story: "stories",
-  bug: "bugs",
-  epic: "epics",
-};
+const VALID_ITEM_TYPES = new Set<BacklogItemType>(["story", "bug", "epic"]);
 
 type AgentStep = {
   tool: string;
@@ -145,7 +143,6 @@ type Proposal =
     };
 
 async function runSearchBacklog(
-  origin: string,
   input: { query?: unknown; types?: unknown }
 ): Promise<{ result: unknown; isError: boolean }> {
   const query = typeof input.query === "string" ? input.query : "";
@@ -153,15 +150,22 @@ async function runSearchBacklog(
     return { result: "Le paramètre query est obligatoire.", isError: true };
   }
 
-  const url = new URL("/api/search", origin);
-  url.searchParams.set("q", query);
-  if (Array.isArray(input.types) && input.types.length > 0) {
-    url.searchParams.set("types", input.types.join(","));
-  }
+  const itemTypes =
+    Array.isArray(input.types) && input.types.length > 0
+      ? (input.types as unknown[]).map((t) => String(t)) as ItemType[]
+      : undefined;
 
-  const res = await fetch(url, { method: "GET" });
-  const data = await res.json();
-  return { result: data, isError: !res.ok };
+  try {
+    const results = await searchBacklog(query, { itemTypes });
+    return { result: results, isError: false };
+  } catch (error) {
+    const message =
+      error instanceof VoyageError
+        ? `Service de recherche sémantique (Voyage AI) indisponible : ${error.message}`
+        : `Erreur lors de la recherche dans le backlog : ${(error as Error).message}`;
+    console.error("Outil search_backlog en échec — input:", input, "erreur:", error);
+    return { result: message, isError: true };
+  }
 }
 
 function buildResultSummary(
@@ -189,24 +193,34 @@ function buildResultSummary(
 }
 
 async function runGetItemDetails(
-  origin: string,
   input: { itemType?: unknown; itemId?: unknown }
 ): Promise<{ result: unknown; isError: boolean }> {
   const itemType = typeof input.itemType === "string" ? input.itemType : "";
   const itemId = typeof input.itemId === "string" ? input.itemId : "";
-  const routeSegment = ITEM_TYPE_ROUTE[itemType];
 
-  if (!routeSegment || !itemId) {
+  if (!VALID_ITEM_TYPES.has(itemType as BacklogItemType) || !itemId) {
     return {
       result: "itemType doit être story, bug ou epic, et itemId est obligatoire.",
       isError: true,
     };
   }
 
-  const url = new URL(`/api/${routeSegment}/${itemId}`, origin);
-  const res = await fetch(url, { method: "GET" });
-  const data = await res.json();
-  return { result: data, isError: !res.ok };
+  try {
+    const item = await getItemDetails(itemType as BacklogItemType, itemId);
+    if (!item) {
+      return { result: `Aucun ${itemType} trouvé avec l'identifiant ${itemId}.`, isError: true };
+    }
+    return { result: item, isError: false };
+  } catch (error) {
+    console.error(
+      `Outil get_item_details en échec — itemType: ${itemType}, itemId: ${itemId}, erreur:`,
+      error
+    );
+    return {
+      result: `Erreur lors de la récupération de l'item : ${(error as Error).message}`,
+      isError: true,
+    };
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -237,7 +251,6 @@ export async function POST(request: NextRequest) {
   }
 
   const client = new Anthropic();
-  const origin = request.nextUrl.origin;
 
   const conversation: Anthropic.MessageParam[] = [...(messages as Anthropic.MessageParam[])];
   const steps: AgentStep[] = [];
@@ -272,102 +285,129 @@ export async function POST(request: NextRequest) {
         const input = (block.input ?? {}) as Record<string, unknown>;
         let toolResult: { result: unknown; isError: boolean };
 
-        switch (block.name) {
-          case "search_backlog":
-            toolResult = await runSearchBacklog(origin, input);
-            break;
-          case "get_item_details":
-            toolResult = await runGetItemDetails(origin, input);
-            break;
-          case "propose_create_story": {
-            const proposal: Proposal = {
-              type: "create_story",
-              title: String(input.title ?? ""),
-              description: String(input.description ?? ""),
-              acceptanceCriteria: String(input.acceptanceCriteria ?? ""),
-              ...(typeof input.storyPoints === "number" ? { storyPoints: input.storyPoints } : {}),
-              ...(typeof input.epicId === "string" && input.epicId ? { epicId: input.epicId } : {}),
-            };
-            proposals.push(proposal);
-            toolResult = {
-              result: {
-                status: "proposition_enregistrée",
-                proposal,
-                note: "Cette story n'a pas été créée. Elle attend la validation de l'utilisateur dans l'interface.",
-              },
-              isError: false,
-            };
-            break;
-          }
-          case "propose_reorder_backlog": {
-            const proposal: Proposal = {
-              type: "reorder_backlog",
-              instructions: String(input.instructions ?? ""),
-              affectedItemIds: Array.isArray(input.affectedItemIds)
-                ? input.affectedItemIds.map((id) => String(id))
-                : [],
-            };
-            proposals.push(proposal);
-            toolResult = {
-              result: {
-                status: "proposition_enregistrée",
-                proposal,
-                note: "Le backlog n'a pas été réorganisé. Cette proposition attend la validation de l'utilisateur dans l'interface.",
-              },
-              isError: false,
-            };
-            break;
-          }
-          case "propose_delete_item": {
-            const itemType = input.itemType === "story" || input.itemType === "bug" ? input.itemType : null;
-            const itemId = typeof input.itemId === "string" ? input.itemId : "";
-
-            if (!itemType || !itemId) {
+        try {
+          switch (block.name) {
+            case "search_backlog":
+              toolResult = await runSearchBacklog(input);
+              break;
+            case "get_item_details":
+              toolResult = await runGetItemDetails(input);
+              break;
+            case "propose_create_story": {
+              const proposal: Proposal = {
+                type: "create_story",
+                title: String(input.title ?? ""),
+                description: String(input.description ?? ""),
+                acceptanceCriteria: String(input.acceptanceCriteria ?? ""),
+                ...(typeof input.storyPoints === "number" ? { storyPoints: input.storyPoints } : {}),
+                ...(typeof input.epicId === "string" && input.epicId ? { epicId: input.epicId } : {}),
+              };
+              proposals.push(proposal);
               toolResult = {
-                result: "itemType doit être 'story' ou 'bug', et itemId est obligatoire.",
-                isError: true,
+                result: {
+                  status: "proposition_enregistrée",
+                  proposal,
+                  note: "Cette story n'a pas été créée. Elle attend la validation de l'utilisateur dans l'interface.",
+                },
+                isError: false,
               };
               break;
             }
-
-            const details = await runGetItemDetails(origin, { itemType, itemId });
-            const item = details.result as Record<string, unknown> | null;
-
-            if (details.isError || !item || typeof item !== "object") {
+            case "propose_reorder_backlog": {
+              const proposal: Proposal = {
+                type: "reorder_backlog",
+                instructions: String(input.instructions ?? ""),
+                affectedItemIds: Array.isArray(input.affectedItemIds)
+                  ? input.affectedItemIds.map((id) => String(id))
+                  : [],
+              };
+              proposals.push(proposal);
               toolResult = {
-                result: `Item introuvable (${itemType} ${itemId}). Vérifie l'identifiant avec search_backlog ou get_item_details avant de proposer une suppression.`,
-                isError: true,
+                result: {
+                  status: "proposition_enregistrée",
+                  proposal,
+                  note: "Le backlog n'a pas été réorganisé. Cette proposition attend la validation de l'utilisateur dans l'interface.",
+                },
+                isError: false,
               };
               break;
             }
+            case "propose_delete_item": {
+              const itemType = input.itemType === "story" || input.itemType === "bug" ? input.itemType : null;
+              const itemId = typeof input.itemId === "string" ? input.itemId : "";
 
-            const proposal: Proposal = {
-              type: "delete_item",
-              itemType,
-              itemId,
-              ...(typeof input.reason === "string" && input.reason ? { reason: input.reason } : {}),
-              itemSnapshot: {
-                title: String(item.title ?? ""),
-                ...(typeof item.statusColumnId === "string" ? { statusColumnId: item.statusColumnId } : {}),
-                ...(typeof item.severity === "string" ? { severity: item.severity } : {}),
-                ...(item.storyPoints !== undefined
-                  ? { storyPoints: item.storyPoints as number | null }
-                  : {}),
-              },
-            };
-            proposals.push(proposal);
-            toolResult = {
-              result: {
-                status: "proposition_enregistrée",
-                proposal,
-                note: "Cet item n'a pas été supprimé. Cette proposition attend la validation de l'utilisateur dans l'interface.",
-              },
-              isError: false,
-            };
-            break;
+              if (!itemType || !itemId) {
+                toolResult = {
+                  result: "itemType doit être 'story' ou 'bug', et itemId est obligatoire.",
+                  isError: true,
+                };
+                break;
+              }
+
+              const details = await runGetItemDetails({ itemType, itemId });
+              const item = details.result as Record<string, unknown> | null;
+
+              if (details.isError || !item || typeof item !== "object") {
+                toolResult = {
+                  result: `Item introuvable (${itemType} ${itemId}). Vérifie l'identifiant avec search_backlog ou get_item_details avant de proposer une suppression.`,
+                  isError: true,
+                };
+                break;
+              }
+
+              const proposal: Proposal = {
+                type: "delete_item",
+                itemType,
+                itemId,
+                ...(typeof input.reason === "string" && input.reason ? { reason: input.reason } : {}),
+                itemSnapshot: {
+                  title: String(item.title ?? ""),
+                  ...(typeof item.statusColumnId === "string" ? { statusColumnId: item.statusColumnId } : {}),
+                  ...(typeof item.severity === "string" ? { severity: item.severity } : {}),
+                  ...(item.storyPoints !== undefined
+                    ? { storyPoints: item.storyPoints as number | null }
+                    : {}),
+                },
+              };
+              proposals.push(proposal);
+              toolResult = {
+                result: {
+                  status: "proposition_enregistrée",
+                  proposal,
+                  note: "Cet item n'a pas été supprimé. Cette proposition attend la validation de l'utilisateur dans l'interface.",
+                },
+                isError: false,
+              };
+              break;
+            }
+            default:
+              toolResult = { result: `Outil inconnu : ${block.name}`, isError: true };
           }
-          default:
-            toolResult = { result: `Outil inconnu : ${block.name}`, isError: true };
+        } catch (error) {
+          const status =
+            typeof error === "object" && error !== null && "status" in error
+              ? (error as { status: unknown }).status
+              : undefined;
+          const responseBody =
+            typeof error === "object" && error !== null && "body" in error
+              ? (error as { body: unknown }).body
+              : undefined;
+          console.error(
+            `Outil ${block.name} a levé une exception inattendue — input:`,
+            input,
+            "statut HTTP:",
+            status ?? "n/a",
+            "corps de la réponse:",
+            responseBody ?? "n/a",
+            "erreur:",
+            error
+          );
+          toolResult = {
+            result: `Erreur inattendue lors de l'exécution de l'outil ${block.name} : ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+            isError: true,
+          };
         }
 
         steps.push({

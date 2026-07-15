@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma, Severity } from "@/app/generated/prisma/client";
 import { FIBONACCI_VALUES, TITLE_MAX_LENGTH, TEXT_MAX_LENGTH, isFibonacciValue } from "@/lib/constants";
 import { buildEmbeddingText, scheduleEmbedding } from "@/lib/embeddings";
+import { getBugById } from "@/lib/backlog-queries";
 import { ItemType } from "@/app/generated/prisma/client";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -13,7 +14,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
 
   try {
-    const bug = await prisma.bug.findUnique({ where: { id } });
+    const bug = await getBugById(id);
 
     if (!bug) {
       return NextResponse.json(

@@ -3,11 +3,8 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/app/generated/prisma/client";
 import { FIBONACCI_VALUES, TITLE_MAX_LENGTH, TEXT_MAX_LENGTH, isFibonacciValue } from "@/lib/constants";
 import { buildEmbeddingText, scheduleEmbedding } from "@/lib/embeddings";
+import { getStoryById } from "@/lib/backlog-queries";
 import { ItemType } from "@/app/generated/prisma/client";
-
-export type StoryWithEpic = Prisma.StoryGetPayload<{
-  include: { epic: true };
-}>;
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -15,10 +12,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const { id } = await params;
 
   try {
-    const story: StoryWithEpic | null = await prisma.story.findUnique({
-      where: { id },
-      include: { epic: true },
-    });
+    const story = await getStoryById(id);
 
     if (!story) {
       return NextResponse.json(
