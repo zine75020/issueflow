@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { prisma } from "@/lib/prisma";
-import { BLOB_TOKEN } from "@/lib/attachments";
 import {
   ATTACHMENT_ALLOWED_MIME_TYPES,
   ATTACHMENT_MAX_PER_ITEM,
@@ -24,7 +23,6 @@ export async function POST(request: NextRequest) {
     const jsonResponse = await handleUpload({
       body,
       request,
-      token: BLOB_TOKEN,
       onBeforeGenerateToken: async (_pathname, clientPayloadRaw) => {
         let storyId: string | undefined;
         let bugId: string | undefined;

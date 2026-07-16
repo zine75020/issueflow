@@ -1,12 +1,6 @@
 import { del } from "@vercel/blob";
 import type { AttachmentMimeType } from "@/lib/constants";
 
-// Le store Vercel Blob de ce projet est exposé sous des variables préfixées BLOB2_ (un
-// ancien store privé occupe déjà les noms BLOB_* par défaut attendus par le SDK) : on lit
-// donc BLOB2_READ_WRITE_TOKEN explicitement et on le passe en paramètre `token` à chaque
-// appel du SDK, plutôt que de compter sur sa résolution automatique de process.env.BLOB_READ_WRITE_TOKEN.
-export const BLOB_TOKEN = process.env.BLOB2_READ_WRITE_TOKEN;
-
 // Signatures binaires (magic numbers) des 4 types autorisés. On ne fait jamais confiance
 // au Content-Type déclaré par le client ni à l'extension du nom de fichier (falsifiables) :
 // seuls ces premiers octets, lus depuis le fichier réellement stocké, déterminent le type.
@@ -56,5 +50,5 @@ export function sniffAttachmentMimeType(bytes: Uint8Array): AttachmentMimeType |
  * cascade en masse n'ont pas la même tolérance à l'échec). */
 export async function deleteAttachmentBlobs(urls: string[]): Promise<void> {
   if (urls.length === 0) return;
-  await del(urls, { token: BLOB_TOKEN });
+  await del(urls);
 }
