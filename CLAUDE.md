@@ -121,6 +121,43 @@ utilisateur.
   supprimait le header Authorization), pas d'un bug de comparaison du secret. Confirmé
   résolu par test manuel de l'utilisateur sur le bon domaine.
 
+## Rate limiting (protection des coûts) — en place
+
+Pour éviter qu'un abus (script, crawler agressif, visiteur malveillant) ne fasse exploser
+la facture Anthropic ou ne remplisse le quota gratuit Vercel Blob — risque réel puisque
+le site est public et sans authentification — deux routes sont protégées via un store
+Redis (sliding window implémenté à la main avec les commandes natives ZADD/
+ZREMRANGEBYSCORE/ZCARD dans une transaction MULTI, voir lib/rateLimit.ts ; identifiant =
+IP du visiteur lue depuis x-forwarded-for) :
+
+- **Assistant Backlog IA** (POST /api/agent/chat) : 5 messages/heure par IP — limite
+  volontairement stricte, l'assistant est une démo de portfolio, pas un produit à fort
+  usage légitime attendu par visiteur. Plus un plafond global de 50 messages/jour tous
+  visiteurs confondus (protège le budget même si l'abus vient de plusieurs IPs
+  différentes), qui désactive l'agent jusqu'au reset (fenêtre glissante de 24h, pas un
+  minuit fixe) ; ce plafond global n'est décrémenté que pour les requêtes qui passent
+  déjà la limite par IP, donc il reflète le nombre réel d'appels facturés à Anthropic,
+  pas les tentatives déjà bloquées par ailleurs. Messages d'erreur dédiés (429) affichés
+  directement comme réponse de l'assistant dans le chat.
+- **Upload de pièces jointes** (POST /api/attachments/token) : 20 uploads/heure par IP,
+  en plus de la limite déjà existante de 10 pièces jointes par item. Vérifiée dans
+  onBeforeGenerateToken : c'est le seul vrai point d'entrée avant qu'un octet ne soit
+  accepté par Vercel Blob, donc le seul endroit où cette limite peut réellement être
+  imposée (contrairement à POST /api/attachments, qui n'intervient qu'après coup, une
+  fois le fichier déjà uploadé). Limite connue et acceptée : le SDK @vercel/blob ne
+  propage pas le message d'erreur exact renvoyé par onBeforeGenerateToken jusqu'au
+  navigateur (il le remplace systématiquement par un message générique) — la limite est
+  bien appliquée côté serveur, mais l'utilisateur voit un message de repli générique
+  plutôt que le texte exact, dans ce cas précis seulement.
+
+Nécessite un store Redis (gratuit, provisionné via l'intégration Vercel Marketplace) connecté
+au projet, variable REDIS_URL (connexion TCP classique, protocole redis:// — ce store-ci
+n'expose pas d'API REST, donc pas de client `@upstash/redis`/`@upstash/ratelimit` : client
+`redis` standard avec un pattern de connexion singleton réutilisée entre invocations
+serverless, voir lib/rateLimit.ts). Les deux routes concernées (POST /api/agent/chat et
+POST /api/attachments/token) sont explicitement forcées en runtime Node.js (`export const
+runtime = "nodejs"`), le client Redis TCP étant incompatible avec le runtime Edge.
+
 ## Prochaine priorité : polish visuel
 
 Passe de polish visuel sur l'ensemble de l'application (couleurs, hiérarchie des boutons,

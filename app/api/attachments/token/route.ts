@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { prisma } from "@/lib/prisma";
+import { checkAttachmentUploadIpLimit, getClientIp } from "@/lib/rateLimit";
 import {
   ATTACHMENT_ALLOWED_MIME_TYPES,
   ATTACHMENT_MAX_PER_ITEM,
   ATTACHMENT_MAX_SIZE_BYTES,
 } from "@/lib/constants";
+
+// Le client Redis (voir lib/rateLimit.ts) ouvre une vraie connexion TCP, incompatible avec
+// le runtime Edge de Vercel — cette route doit rester en Node.js.
+export const runtime = "nodejs";
+
+const RATE_LIMIT_MESSAGE = "Trop d'envois de fichiers pour l'instant, réessaie dans quelques minutes.";
 
 /**
  * Génère le token client à usage unique dont @vercel/blob a besoin pour uploader
@@ -24,6 +31,16 @@ export async function POST(request: NextRequest) {
       body,
       request,
       onBeforeGenerateToken: async (_pathname, clientPayloadRaw) => {
+        // Protection du quota gratuit Vercel Blob (voir CLAUDE.md) : vérifiée en tout
+        // premier, avant même de parser le clientPayload, pour ne consommer aucune
+        // ressource inutile sur une requête qu'on va de toute façon rejeter. C'est le
+        // seul vrai point d'entrée avant qu'un octet ne soit accepté par Vercel Blob,
+        // donc le seul endroit où cette limite peut réellement être imposée.
+        const { success } = await checkAttachmentUploadIpLimit(getClientIp(request));
+        if (!success) {
+          throw new Error(RATE_LIMIT_MESSAGE);
+        }
+
         let storyId: string | undefined;
         let bugId: string | undefined;
         try {
@@ -75,9 +92,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(jsonResponse);
   } catch (error) {
     console.error("POST /api/attachments/token failed:", error);
+    const message =
+      error instanceof Error ? error.message : "Erreur lors de la génération du token d'upload.";
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erreur lors de la génération du token d'upload." },
-      { status: 400 }
+      { error: message },
+      { status: message === RATE_LIMIT_MESSAGE ? 429 : 400 }
     );
   }
 }

@@ -92,15 +92,21 @@ export function AttachmentSection({
 
       setAttachments((prev) => [...prev, data]);
     } catch (err) {
-      // Le rejet pour taille excessive a lieu côté Vercel Blob avant même d'atteindre notre
-      // serveur (voir /api/attachments/token) : son message n'est pas dans notre contrôle,
-      // on le remplace donc par un message clair et cohérent avec le reste de l'app.
+      // Deux cas où le message serveur exact n'atteint pas ce catch, remplacé par le SDK
+      // @vercel/blob par un texte générique : le rejet pour taille excessive (contrôlé par
+      // Vercel Blob lui-même, avant même d'atteindre /api/attachments/token) et tout rejet
+      // levé depuis onBeforeGenerateToken (limite d'items, limite de fréquence, item
+      // introuvable...) — dans les deux cas on retombe sur un message clair et cohérent.
       const rawMessage = err instanceof Error ? err.message : "";
-      setError(
-        rawMessage.includes("too large")
-          ? `Le fichier dépasse la taille maximale autorisée (${ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024)} Mo).`
-          : rawMessage || "Erreur lors de l'upload."
-      );
+      if (rawMessage.includes("too large")) {
+        setError(
+          `Le fichier dépasse la taille maximale autorisée (${ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024)} Mo).`
+        );
+      } else if (rawMessage.includes("Failed to retrieve the client token")) {
+        setError("Envoi refusé (limite atteinte ou fichier non conforme). Réessaie dans quelques minutes.");
+      } else {
+        setError(rawMessage || "Erreur lors de l'upload.");
+      }
     } finally {
       setUploading(false);
       setProgress(0);

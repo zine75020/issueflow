@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { searchBacklog, getItemDetails, VoyageError, type BacklogItemType } from "@/lib/backlog-queries";
+import { checkAgentChatIpLimit, checkAgentChatGlobalLimit, getClientIp } from "@/lib/rateLimit";
 import { ItemType } from "@/app/generated/prisma/client";
+
+// Le client Redis (voir lib/rateLimit.ts) ouvre une vraie connexion TCP, incompatible avec
+// le runtime Edge de Vercel — cette route doit rester en Node.js.
+export const runtime = "nodejs";
 
 const MODEL = "claude-sonnet-5";
 const MAX_ITERATIONS = 5;
@@ -226,6 +231,29 @@ async function runGetItemDetails(
 }
 
 export async function POST(request: NextRequest) {
+  // Protection des coûts de l'API Anthropic (voir CLAUDE.md pour le détail des limites) :
+  // vérifiées avant toute autre chose, pour ne jamais parser/traiter une requête qu'on va
+  // de toute façon rejeter. Le plafond global n'est consommé que si la limite par IP est
+  // elle-même respectée, pour qu'il reflète le nombre réel d'appels faits à Anthropic (pas
+  // les tentatives déjà bloquées par ailleurs).
+  const clientIp = getClientIp(request);
+
+  const ipLimitResult = await checkAgentChatIpLimit(clientIp);
+  if (!ipLimitResult.success) {
+    return NextResponse.json(
+      { error: "Trop de messages pour l'instant, réessaie dans quelques minutes." },
+      { status: 429 }
+    );
+  }
+
+  const globalLimitResult = await checkAgentChatGlobalLimit();
+  if (!globalLimitResult.success) {
+    return NextResponse.json(
+      { error: "L'assistant a atteint sa limite d'utilisation pour aujourd'hui, reviens demain." },
+      { status: 429 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
