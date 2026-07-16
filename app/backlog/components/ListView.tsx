@@ -156,7 +156,7 @@ export function ListView({
                       <div
                         key={story.id}
                         onClick={() => onOpenStory(story.id)}
-                        className="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-surface-2"
+                        className="px-4 py-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between cursor-pointer hover:bg-surface-2"
                       >
                         <div className="min-w-0">
                           <p className="truncate font-medium text-sm">
@@ -168,7 +168,7 @@ export function ListView({
                             </p>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 flex-wrap md:shrink-0">
                           {story.sprintId && sprintNameById.has(story.sprintId) && (
                             <SprintBadge name={sprintNameById.get(story.sprintId)!} />
                           )}
@@ -199,7 +199,7 @@ export function ListView({
               <div
                 key={bug.id}
                 onClick={() => onOpenBug(bug.id)}
-                className="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-surface-2"
+                className="px-4 py-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between cursor-pointer hover:bg-surface-2"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-sm">{bug.title}</p>
@@ -209,7 +209,7 @@ export function ListView({
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 flex-wrap md:shrink-0">
                   {bug.sprintId && sprintNameById.has(bug.sprintId) && (
                     <SprintBadge name={sprintNameById.get(bug.sprintId)!} />
                   )}

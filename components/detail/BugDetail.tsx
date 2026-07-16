@@ -161,7 +161,7 @@ export function BugDetail({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Sévérité" required>
               <select
                 value={severity}
@@ -190,7 +190,7 @@ export function BugDetail({
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Remaining Effort (Story Points)">
               <select
                 value={remainingEffort}

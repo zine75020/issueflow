@@ -130,7 +130,7 @@ export function AssignPanel({
               {stories.map((story) => (
                 <label
                   key={story.id}
-                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-surface-2"
+                  className="flex items-center gap-2 px-3 py-2 max-md:py-3 text-sm cursor-pointer hover:bg-surface-2"
                 >
                   <input
                     type="checkbox"
@@ -153,7 +153,7 @@ export function AssignPanel({
               {bugs.map((bug) => (
                 <label
                   key={bug.id}
-                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-surface-2"
+                  className="flex items-center gap-2 px-3 py-2 max-md:py-3 text-sm cursor-pointer hover:bg-surface-2"
                 >
                   <input
                     type="checkbox"

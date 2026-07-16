@@ -179,7 +179,7 @@ export function StoryDetail({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Story points">
               <select
                 value={storyPoints}
@@ -208,7 +208,7 @@ export function StoryDetail({
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Statut">
               <select
                 value={statusColumnId}

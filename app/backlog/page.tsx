@@ -138,7 +138,7 @@ export default function BacklogPage() {
           <div className="inline-flex rounded-lg border border-border overflow-hidden text-sm">
             <button
               onClick={() => setView("list")}
-              className={`px-3 py-1.5 transition-colors ${
+              className={`px-3 py-1.5 max-md:min-h-11 flex items-center justify-center transition-colors ${
                 view === "list" ? "bg-accent text-accent-fg" : "hover:bg-surface-2"
               }`}
             >
@@ -146,7 +146,7 @@ export default function BacklogPage() {
             </button>
             <button
               onClick={() => setView("kanban")}
-              className={`px-3 py-1.5 transition-colors border-l border-border ${
+              className={`px-3 py-1.5 max-md:min-h-11 flex items-center justify-center transition-colors border-l border-border ${
                 view === "kanban" ? "bg-accent text-accent-fg" : "hover:bg-surface-2"
               }`}
             >

@@ -108,6 +108,14 @@ export function SparkleIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+export function MenuIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} {...props}>
+      <path d="M3 6h14M3 10h14M3 14h14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function SendIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} {...props}>

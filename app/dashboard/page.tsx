@@ -96,7 +96,7 @@ function VelocityChart({
             <span className="text-xs text-muted truncate w-full text-center" title={d.sprintName}>
               {d.sprintName}
             </span>
-            <span className="text-[10px] text-muted">{formatDateShort(d.endDate)}</span>
+            <span className="text-xs md:text-[10px] text-muted">{formatDateShort(d.endDate)}</span>
           </div>
         );
       })}
@@ -164,7 +164,7 @@ export default function DashboardPage() {
 
         {!loading && !error && data && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <StatCard label="Epics" value={data.totals.epics} />
               <StatCard label="Stories" value={data.totals.stories} />
               <StatCard label="Bugs" value={data.totals.bugs} />
@@ -174,7 +174,7 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <StatCard label="Sprints terminés" value={data.sprintCounts.completed} />
               <StatCard label="Sprints en cours" value={data.sprintCounts.active} />
               <StatCard label="Sprints planifiés" value={data.sprintCounts.planned} />

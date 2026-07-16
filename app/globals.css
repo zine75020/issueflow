@@ -247,3 +247,28 @@ body {
   color: var(--accent);
   text-decoration: underline;
 }
+
+/* Ajustements mobile (<768px) : zones tactiles >= 44px et texte >= 14px,
+   sans toucher au rendu desktop. */
+@media (max-width: 767px) {
+  .text-xs {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .badge {
+    font-size: 0.875rem;
+    padding: 0.1875rem 0.65rem;
+  }
+  .input {
+    min-height: 2.75rem;
+    padding: 0.75rem 0.75rem;
+  }
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

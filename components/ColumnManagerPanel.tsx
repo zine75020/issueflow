@@ -156,7 +156,7 @@ export function ColumnManagerPanel({ onClose }: { onClose: () => void }) {
                       disabled={busy || index === 0}
                       onClick={() => handleMove(col.id, -1)}
                       aria-label="Déplacer vers le haut"
-                      className="rounded border border-border p-1 hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center rounded border border-border p-1 max-md:h-11 max-md:w-11 hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <ArrowUpIcon className="h-3.5 w-3.5" />
                     </button>
@@ -165,7 +165,7 @@ export function ColumnManagerPanel({ onClose }: { onClose: () => void }) {
                       disabled={busy || index === columns.length - 1}
                       onClick={() => handleMove(col.id, 1)}
                       aria-label="Déplacer vers le bas"
-                      className="rounded border border-border p-1 hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="flex items-center justify-center rounded border border-border p-1 max-md:h-11 max-md:w-11 hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <ArrowDownIcon className="h-3.5 w-3.5" />
                     </button>

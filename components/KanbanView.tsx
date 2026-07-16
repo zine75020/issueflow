@@ -101,14 +101,15 @@ export function KanbanView({
       {columnsLoading ? (
         <p className="text-sm text-muted">Chargement des colonnes…</p>
       ) : (
-        <div className="overflow-x-auto">
-          <div
-            className="grid gap-4"
-            style={{
-              gridTemplateColumns: `repeat(${columns.length}, minmax(240px, 1fr))`,
-            }}
-          >
-            {columns.map((col) => {
+        <div className="relative">
+          <div className="overflow-x-auto pb-1">
+            <div
+              className="grid gap-4"
+              style={{
+                gridTemplateColumns: `repeat(${columns.length}, minmax(240px, 1fr))`,
+              }}
+            >
+              {columns.map((col) => {
               const colItems = items
                 .filter((item) => item.data.statusColumnId === col.id)
                 .sort((a, b) => a.data.backlogPosition - b.data.backlogPosition);
@@ -236,8 +237,13 @@ export function KanbanView({
                   </div>
                 </div>
               );
-            })}
+              })}
+            </div>
           </div>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-linear-to-l from-bg to-transparent md:hidden"
+          />
         </div>
       )}
 

@@ -246,14 +246,14 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-full flex-col border-l border-border bg-surface shadow-xl sm:w-(--panel-width)"
+      className="fixed inset-y-0 right-0 z-40 flex w-full max-w-full flex-col border-l border-border bg-surface shadow-xl md:w-(--panel-width)"
       style={{ "--panel-width": `${panelWidth}px` } as React.CSSProperties}
     >
       <div
         onPointerDown={handleResizeStart}
         onPointerMove={handleResizeMove}
         onPointerUp={handleResizeEnd}
-        className={`absolute left-0 top-0 bottom-0 z-10 hidden w-1.5 -translate-x-1/2 cursor-col-resize touch-none transition-colors sm:block ${
+        className={`absolute left-0 top-0 bottom-0 z-10 hidden w-1.5 -translate-x-1/2 cursor-col-resize touch-none transition-colors md:block ${
           isResizing ? "bg-accent" : "bg-transparent hover:bg-accent/50"
         }`}
         role="separator"
@@ -269,9 +269,9 @@ export function AssistantPanel({ onClose }: { onClose: () => void }) {
         <button
           onClick={onClose}
           aria-label="Fermer l'assistant"
-          className="text-muted hover:text-fg"
+          className="flex items-center justify-center text-muted hover:text-fg max-md:h-11 max-md:w-11"
         >
-          <CloseIcon className="h-4 w-4" />
+          <CloseIcon className="h-4 w-4 max-md:h-5 max-md:w-5" />
         </button>
       </div>
 
