@@ -100,15 +100,25 @@ export async function searchBacklog(
     .filter((result): result is SearchBacklogResult => result !== null);
 }
 
-export type StoryWithEpic = Prisma.StoryGetPayload<{ include: { epic: true; statusColumn: true } }>;
+const COMMENTS_INCLUDE = { orderBy: { createdAt: "asc" as const } };
+
+export type StoryWithEpic = Prisma.StoryGetPayload<{
+  include: { epic: true; statusColumn: true; comments: true };
+}>;
 export type EpicWithStories = Prisma.EpicGetPayload<{ include: { stories: true } }>;
 
 export function getStoryById(id: string): Promise<StoryWithEpic | null> {
-  return prisma.story.findUnique({ where: { id }, include: { epic: true, statusColumn: true } });
+  return prisma.story.findUnique({
+    where: { id },
+    include: { epic: true, statusColumn: true, comments: COMMENTS_INCLUDE },
+  });
 }
 
 export function getBugById(id: string) {
-  return prisma.bug.findUnique({ where: { id }, include: { statusColumn: true } });
+  return prisma.bug.findUnique({
+    where: { id },
+    include: { statusColumn: true, comments: COMMENTS_INCLUDE },
+  });
 }
 
 export function getEpicById(id: string): Promise<EpicWithStories | null> {

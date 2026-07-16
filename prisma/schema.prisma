@@ -61,6 +61,7 @@ model Story {
   sprintId           String?
   sprint             Sprint?     @relation(fields: [sprintId], references: [id])
   backlogPosition    Int
+  comments           Comment[]
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 }
@@ -76,8 +77,22 @@ model Bug {
   sprintId        String?
   sprint          Sprint?     @relation(fields: [sprintId], references: [id])
   backlogPosition Int
+  comments        Comment[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+}
+
+// Un commentaire appartient à une Story OU un Bug, jamais les deux (XOR
+// validé côté API, pas en contrainte SQLite native). Pas de champ auteur :
+// l'app n'a pas d'authentification multi-utilisateur pour l'instant.
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  storyId   String?
+  story     Story?   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  bugId     String?
+  bug       Bug?     @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }
 
 model Embedding {

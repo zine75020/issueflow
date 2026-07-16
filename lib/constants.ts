@@ -42,3 +42,4 @@ export function isFibonacciValue(value: number): boolean {
 
 export const TITLE_MAX_LENGTH = 200;
 export const TEXT_MAX_LENGTH = 5000;
+export const COMMENT_MAX_LENGTH = 2000;

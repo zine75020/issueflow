@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/Modal";
 import { Field } from "@/components/Field";
+import { CommentSection } from "@/components/CommentSection";
 import { useColumns } from "@/lib/useColumns";
 import { FIBONACCI_OPTIONS, TITLE_MAX_LENGTH, TEXT_MAX_LENGTH } from "@/lib/constants";
-import type { Epic, Sprint, Story } from "@/lib/types";
+import type { Comment, Epic, Sprint, Story } from "@/lib/types";
+
+type StoryWithComments = Story & { comments: Comment[] };
 
 export function StoryDetail({
   id,
@@ -20,7 +23,7 @@ export function StoryDetail({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const [story, setStory] = useState<Story | null>(null);
+  const [story, setStory] = useState<StoryWithComments | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -48,7 +51,7 @@ export function StoryDetail({
         if (!res.ok) {
           throw new Error("Erreur lors du chargement de la story.");
         }
-        const data: Story = await res.json();
+        const data: StoryWithComments = await res.json();
         if (cancelled) return;
         setStory(data);
         setTitle(data.title);
@@ -252,6 +255,13 @@ export function StoryDetail({
               ))}
             </select>
           </Field>
+
+          <CommentSection
+            key={id}
+            itemType="story"
+            itemId={id}
+            initialComments={story.comments}
+          />
 
           {confirmingDelete ? (
             <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">

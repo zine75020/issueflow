@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/Modal";
 import { Field } from "@/components/Field";
+import { CommentSection } from "@/components/CommentSection";
 import { SEVERITY_OPTIONS, FIBONACCI_OPTIONS, TITLE_MAX_LENGTH, TEXT_MAX_LENGTH } from "@/lib/constants";
 import { useColumns } from "@/lib/useColumns";
-import type { Bug, Severity, Sprint } from "@/lib/types";
+import type { Bug, Comment, Severity, Sprint } from "@/lib/types";
+
+type BugWithComments = Bug & { comments: Comment[] };
 
 export function BugDetail({
   id,
@@ -18,7 +21,7 @@ export function BugDetail({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const [bug, setBug] = useState<Bug | null>(null);
+  const [bug, setBug] = useState<BugWithComments | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -44,7 +47,7 @@ export function BugDetail({
         if (!res.ok) {
           throw new Error("Erreur lors du chargement du bug.");
         }
-        const data: Bug = await res.json();
+        const data: BugWithComments = await res.json();
         if (cancelled) return;
         setBug(data);
         setTitle(data.title);
@@ -219,6 +222,13 @@ export function BugDetail({
               </select>
             </Field>
           </div>
+
+          <CommentSection
+            key={id}
+            itemType="bug"
+            itemId={id}
+            initialComments={bug.comments}
+          />
 
           {confirmingDelete ? (
             <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">

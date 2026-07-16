@@ -41,7 +41,7 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "get_item_details",
     description:
-      "Récupère les détails complets d'un item du backlog (story, bug ou epic) à partir de son type et de son identifiant.",
+      "Récupère les détails complets d'un item du backlog (story, bug ou epic) à partir de son type et de son identifiant. Pour une story ou un bug, la réponse inclut aussi ses commentaires (champ comments, triés du plus ancien au plus récent).",
     input_schema: {
       type: "object",
       properties: {

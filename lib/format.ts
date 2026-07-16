@@ -5,6 +5,15 @@ export function formatDateShort(iso: string) {
   });
 }
 
+export function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function formatEffortMeta(
   storyPoints: number | null,
   remainingEffort: number | null

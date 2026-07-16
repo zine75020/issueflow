@@ -67,3 +67,11 @@ export interface SprintDetail extends Sprint {
   stories: Story[];
   bugs: Bug[];
 }
+
+export interface Comment {
+  id: string;
+  content: string;
+  storyId: string | null;
+  bugId: string | null;
+  createdAt: string;
+}
