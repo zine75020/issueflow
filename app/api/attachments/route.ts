@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { head } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
-import { sniffAttachmentMimeType, deleteAttachmentBlobs } from "@/lib/attachments";
+import { sniffAttachmentMimeType, deleteAttachmentBlobs, BLOB_TOKEN } from "@/lib/attachments";
 import {
   ATTACHMENT_MAX_PER_ITEM,
   ATTACHMENT_MAX_SIZE_BYTES,
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       : "fichier";
 
   try {
-    const blobInfo = await head(url);
+    const blobInfo = await head(url, { token: BLOB_TOKEN });
 
     if (blobInfo.size > ATTACHMENT_MAX_SIZE_BYTES) {
       await deleteAttachmentBlobs([url]);
