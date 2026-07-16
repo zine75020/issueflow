@@ -43,3 +43,15 @@ export function isFibonacciValue(value: number): boolean {
 export const TITLE_MAX_LENGTH = 200;
 export const TEXT_MAX_LENGTH = 5000;
 export const COMMENT_MAX_LENGTH = 2000;
+
+// Pièces jointes (Vercel Blob) : constantes partagées entre client (pré-validation UX,
+// avant même de lancer l'upload) et serveur (validation faisant foi, jamais contournable).
+export const ATTACHMENT_MAX_SIZE_BYTES = 5 * 1024 * 1024;
+export const ATTACHMENT_MAX_PER_ITEM = 10;
+export const ATTACHMENT_ALLOWED_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+] as const;
+export type AttachmentMimeType = (typeof ATTACHMENT_ALLOWED_MIME_TYPES)[number];

@@ -4,6 +4,7 @@ import type { Prisma } from "@/app/generated/prisma/client";
 import { FIBONACCI_VALUES, TITLE_MAX_LENGTH, TEXT_MAX_LENGTH, isFibonacciValue } from "@/lib/constants";
 import { buildEmbeddingText, scheduleEmbedding } from "@/lib/embeddings";
 import { getStoryById } from "@/lib/backlog-queries";
+import { deleteAttachmentBlobs } from "@/lib/attachments";
 import { ItemType } from "@/app/generated/prisma/client";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -246,6 +247,23 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
         { error: "Story introuvable." },
         { status: 404 }
       );
+    }
+
+    // Prisma cascade les lignes Comment/Attachment en base à la suppression de la story,
+    // mais ne sait rien des blobs Vercel Blob associés : on les supprime nous-mêmes avant.
+    // Best-effort : un échec ici ne doit pas empêcher l'utilisateur de supprimer sa story
+    // (contrairement à la suppression d'une pièce jointe isolée, bloquer une suppression
+    // d'item entier pour un seul blob récalcitrant serait pire que l'orphelin résiduel).
+    const attachments = await prisma.attachment.findMany({
+      where: { storyId: id },
+      select: { url: true },
+    });
+    if (attachments.length > 0) {
+      try {
+        await deleteAttachmentBlobs(attachments.map((a) => a.url));
+      } catch (error) {
+        console.error(`Échec de la suppression des blobs de la story ${id}:`, error);
+      }
     }
 
     await prisma.story.delete({ where: { id } });

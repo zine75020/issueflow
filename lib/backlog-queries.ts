@@ -101,23 +101,33 @@ export async function searchBacklog(
 }
 
 const COMMENTS_INCLUDE = { orderBy: { createdAt: "asc" as const } };
+const ATTACHMENTS_INCLUDE = { orderBy: { createdAt: "asc" as const } };
 
 export type StoryWithEpic = Prisma.StoryGetPayload<{
-  include: { epic: true; statusColumn: true; comments: true };
+  include: { epic: true; statusColumn: true; comments: true; attachments: true };
 }>;
 export type EpicWithStories = Prisma.EpicGetPayload<{ include: { stories: true } }>;
 
 export function getStoryById(id: string): Promise<StoryWithEpic | null> {
   return prisma.story.findUnique({
     where: { id },
-    include: { epic: true, statusColumn: true, comments: COMMENTS_INCLUDE },
+    include: {
+      epic: true,
+      statusColumn: true,
+      comments: COMMENTS_INCLUDE,
+      attachments: ATTACHMENTS_INCLUDE,
+    },
   });
 }
 
 export function getBugById(id: string) {
   return prisma.bug.findUnique({
     where: { id },
-    include: { statusColumn: true, comments: COMMENTS_INCLUDE },
+    include: {
+      statusColumn: true,
+      comments: COMMENTS_INCLUDE,
+      attachments: ATTACHMENTS_INCLUDE,
+    },
   });
 }
 

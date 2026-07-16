@@ -62,6 +62,7 @@ model Story {
   sprint             Sprint?     @relation(fields: [sprintId], references: [id])
   backlogPosition    Int
   comments           Comment[]
+  attachments        Attachment[]
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 }
@@ -78,6 +79,7 @@ model Bug {
   sprint          Sprint?     @relation(fields: [sprintId], references: [id])
   backlogPosition Int
   comments        Comment[]
+  attachments     Attachment[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 }
@@ -93,6 +95,23 @@ model Comment {
   bugId     String?
   bug       Bug?     @relation(fields: [bugId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+// Même XOR storyId/bugId que Comment. Le fichier réel vit sur Vercel Blob : blobPathname
+// est indispensable pour pouvoir le supprimer là-bas (del()) quand la ligne est supprimée
+// ici, sinon on accumule des blobs orphelins qui consomment le quota gratuit pour rien.
+model Attachment {
+  id           String   @id @default(cuid())
+  filename     String
+  url          String
+  blobPathname String
+  mimeType     String
+  size         Int
+  storyId      String?
+  story        Story?   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  bugId        String?
+  bug          Bug?     @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
 }
 
 model Embedding {

@@ -75,3 +75,15 @@ export interface Comment {
   bugId: string | null;
   createdAt: string;
 }
+
+export interface Attachment {
+  id: string;
+  filename: string;
+  url: string;
+  blobPathname: string;
+  mimeType: string;
+  size: number;
+  storyId: string | null;
+  bugId: string | null;
+  createdAt: string;
+}

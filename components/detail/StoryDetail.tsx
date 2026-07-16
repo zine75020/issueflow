@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/Modal";
 import { Field } from "@/components/Field";
 import { CommentSection } from "@/components/CommentSection";
+import { AttachmentSection } from "@/components/AttachmentSection";
 import { useColumns } from "@/lib/useColumns";
 import { FIBONACCI_OPTIONS, TITLE_MAX_LENGTH, TEXT_MAX_LENGTH } from "@/lib/constants";
-import type { Comment, Epic, Sprint, Story } from "@/lib/types";
+import type { Attachment, Comment, Epic, Sprint, Story } from "@/lib/types";
 
-type StoryWithComments = Story & { comments: Comment[] };
+type StoryWithComments = Story & { comments: Comment[]; attachments: Attachment[] };
 
 export function StoryDetail({
   id,
@@ -261,6 +262,13 @@ export function StoryDetail({
             itemType="story"
             itemId={id}
             initialComments={story.comments}
+          />
+
+          <AttachmentSection
+            key={id}
+            itemType="story"
+            itemId={id}
+            initialAttachments={story.attachments}
           />
 
           {confirmingDelete ? (

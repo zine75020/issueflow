@@ -120,6 +120,27 @@ export function TrashIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+export function PaperclipIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} {...props}>
+      <path
+        d="M13.5 6.5l-5.8 5.8a2.3 2.3 0 003.3 3.3l6-6a3.8 3.8 0 00-5.4-5.4l-6 6a5.3 5.3 0 007.5 7.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function FileIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} {...props}>
+      <path d="M6 3h5l3 3v11H6V3z" strokeLinejoin="round" />
+      <path d="M11 3v3h3" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function MenuIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} {...props}>

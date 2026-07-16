@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/Modal";
 import { Field } from "@/components/Field";
 import { CommentSection } from "@/components/CommentSection";
+import { AttachmentSection } from "@/components/AttachmentSection";
 import { SEVERITY_OPTIONS, FIBONACCI_OPTIONS, TITLE_MAX_LENGTH, TEXT_MAX_LENGTH } from "@/lib/constants";
 import { useColumns } from "@/lib/useColumns";
-import type { Bug, Comment, Severity, Sprint } from "@/lib/types";
+import type { Attachment, Bug, Comment, Severity, Sprint } from "@/lib/types";
 
-type BugWithComments = Bug & { comments: Comment[] };
+type BugWithComments = Bug & { comments: Comment[]; attachments: Attachment[] };
 
 export function BugDetail({
   id,
@@ -228,6 +229,13 @@ export function BugDetail({
             itemType="bug"
             itemId={id}
             initialComments={bug.comments}
+          />
+
+          <AttachmentSection
+            key={id}
+            itemType="bug"
+            itemId={id}
+            initialAttachments={bug.attachments}
           />
 
           {confirmingDelete ? (

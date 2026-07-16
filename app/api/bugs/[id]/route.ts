@@ -4,6 +4,7 @@ import { Prisma, Severity } from "@/app/generated/prisma/client";
 import { FIBONACCI_VALUES, TITLE_MAX_LENGTH, TEXT_MAX_LENGTH, isFibonacciValue } from "@/lib/constants";
 import { buildEmbeddingText, scheduleEmbedding } from "@/lib/embeddings";
 import { getBugById } from "@/lib/backlog-queries";
+import { deleteAttachmentBlobs } from "@/lib/attachments";
 import { ItemType } from "@/app/generated/prisma/client";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -209,6 +210,21 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
         { error: "Bug introuvable." },
         { status: 404 }
       );
+    }
+
+    // Voir le commentaire équivalent dans DELETE /api/stories/[id] : cascade DB automatique
+    // via Prisma, mais les blobs Vercel Blob doivent être supprimés explicitement, en
+    // best-effort pour ne pas bloquer la suppression du bug si un blob ne répond pas.
+    const attachments = await prisma.attachment.findMany({
+      where: { bugId: id },
+      select: { url: true },
+    });
+    if (attachments.length > 0) {
+      try {
+        await deleteAttachmentBlobs(attachments.map((a) => a.url));
+      } catch (error) {
+        console.error(`Échec de la suppression des blobs du bug ${id}:`, error);
+      }
     }
 
     await prisma.bug.delete({ where: { id } });

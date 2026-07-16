@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ItemType } from "@/app/generated/prisma/client";
 import { buildEmbeddingText, upsertEmbeddingNow } from "@/lib/embeddings";
+import { deleteAttachmentBlobs } from "@/lib/attachments";
 import { seedTurso } from "@/prisma/seed-demo.mjs";
 
 export const runtime = "nodejs";
@@ -26,6 +27,20 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Les blobs Vercel Blob des pièces jointes de démo ne sont pas supprimés par la cascade
+    // Prisma (qui n'agit qu'en base) : sans ce nettoyage explicite, le quota gratuit se
+    // remplirait un peu plus à chaque reset quotidien sans jamais être vidé.
+    const attachmentUrls = (
+      await prisma.attachment.findMany({ select: { url: true } })
+    ).map((a) => a.url);
+    if (attachmentUrls.length > 0) {
+      try {
+        await deleteAttachmentBlobs(attachmentUrls);
+      } catch (error) {
+        console.error("Échec de la suppression des blobs de démo lors du reset:", error);
+      }
+    }
+
     // Ordre imposé par les contraintes de clé étrangère (Story/Bug -> BoardColumn en
     // onDelete: Restrict, Story -> Epic, Story/Bug -> Sprint) : on vide les tables qui
     // référencent avant celles qui sont référencées.
